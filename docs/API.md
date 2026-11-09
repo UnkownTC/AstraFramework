@@ -4,12 +4,12 @@
 |---|---|
 | 适用版本 | `1.0.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
-| 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2、§4 手写，与源码冲突时以源码为准 |
+| 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
 **怎么读**
 
 - 要用框架做事 → §1 看框架在什么时机、按什么规则接管你的类型；§2 按需求查该继承谁、走哪个入口。
-- 要改框架 → 先在 §3 确认类型/成员是否属于对外 API；删除或改签名即破坏性变更（AGENTS.md §6），改完重新生成 §3。
+- 要改框架 → 先在 §3 确认类型/成员是否属于对外 API。
 
 ## 1. 加载与自动注册
 
@@ -72,12 +72,10 @@
 
 <!-- AUTO-GEN:BEGIN（由 tools/ApiDoc.cs 生成，勿手改） -->
 
-> **自动段**：以下内容由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**。
-> 改动公开签名后执行 `dotnet run tools/ApiDoc.cs` 重新生成；评审或 CI 可用 `-- --check` 校验是否漂移。
+> 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
 - **统计**：公开类型 89 个（class 62 / enum 8 / interface 16 / struct 3），命名空间 19 个；公开成员 575 个。
-- **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录，框架内部类型见附录 B。
-- **文档缺口**：12 个公开类型没有 `<summary>`（清单见附录 A）。
+- **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
 
@@ -122,7 +120,7 @@
 - `public override Version Version { get; }`
 - `public override Version RequiredApiVersion { get; }`
 - `public override LoadPriority Priority { get; }`
-- `public override void LoadConfigs()` — 启用时注册框架主管理器。
+- `public override void LoadConfigs()` — 加载配置后同步到静态访问点，供各管理器读取。
 - `public override void Enable()`
 - `public override void Disable()` — 禁用时注销主管理器并销毁所有自动注册的资源。
 
@@ -1438,7 +1436,7 @@
 - `public IReadOnlyDictionary<string, int> Table { get; }` — 刷新配置：自定义角色 Id → 数量（-1 表示填充剩余玩家）。
 - `public virtual CustomTeam? Team { get; }` — 波次的主阵营（取 Teams 首个）；为空时不参与自定义敌我关系。
 - `public virtual IReadOnlyList<CustomTeam> Teams { get; }` — 本波次归属的自定义阵营实例列表。
-- `public IReadOnlyList<CustomRole> Roles { get; }` — 本波次包含的自定义角色（由角色侧的 WaveIds 反向填充）。
+- `public IReadOnlyList<CustomRole> Roles { get; }` — 本波次包含的自定义角色（角色实现 IWaveSpawnRole 时由框架反向登记）。
 - `public virtual bool ModifyThreat { get; }` — 是否参与设施威胁指数调整。
 - `public virtual float CustomThreat { get; }` — 自定义威胁调整值；小于零时由处理器按波次威胁等级计算。
 - `public virtual bool SpawnProtect { get; }` — 是否为生成的玩家附带出生保护。
@@ -1534,89 +1532,4 @@
 
 - `public static List<T> Sort<T>(this IWaveSorter<T> sorter, IEnumerable<T> waves)` — 按排序器的优先级返回一个新列表（靠前者优先）。
 
----
-
-### 附录 A：缺 `<summary>` 的公开类型
-
-AGENTS.md §5.2 要求公开类型必须有 XML 文档；以下类型尚未补齐。
-
-- `Astra.ICustomContent` — `src/Astra.Framework/ICustomContent.cs`
-- `Astra.Abilities.IAbilityRole` — `src/Astra.Framework/Abilities/IAbilityRole.cs`
-- `Astra.Attributes.PatchApiVersionAttribute` — `src/Astra.Framework/Attributes/PatchApiVersionAttribute.cs`
-- `Astra.Attributes.PatchGameVersionAttribute` — `src/Astra.Framework/Attributes/PatchGameVersionAttribute.cs`
-- `Astra.Effects.CustomEffect` — `src/Astra.Framework/Effects/CustomEffect.cs`
-- `Astra.Effects.IEffects` — `src/Astra.Framework/Effects/IEffects.cs`
-- `Astra.Events.EventHandlerStatus` — `src/Astra.Framework/Events/EventManager.cs`
-- `Astra.HumeShield.CustomHumeShieldEventHandler` — `src/Astra.Framework/HumeShield/CustomHumeShieldEventHandler.cs`
-- `Astra.Patching.PatchStatus` — `src/Astra.Framework/Patching/PatchManager.cs`
-- `Astra.Roles.CustomRole` — `src/Astra.Framework/Roles/CustomRole.cs`
-- `Astra.Roles.IOriginalRole` — `src/Astra.Framework/Roles/IOriginalRole.cs`
-- `Astra.Roles.StandardRole` — `src/Astra.Framework/Roles/StandardRole.cs`
-
----
-
-### 附录 B：框架内部类型（`internal`，非对外 API）
-
-| 类型 | 命名空间 | 源码 | 说明 |
-| --- | --- | --- | --- |
-| `CustomAbilityTemplateManager` | `Astra.Abilities` | `src/Astra.Framework/Abilities/CustomAbilityTemplateManager.cs` | 技能模板管理器：保存全局技能模板（按 Id / Type 索引）， 并监听玩家加… |
-| `AudioManager` | `Astra.Audio` | `src/Astra.Framework/Audio/AudioManager.cs` | 音频管理器：回合重启时自动归还所有音频播放器到对象池。 |
-| `TokenManager` | `Astra.Cancellation` | `src/Astra.Framework/Cancellation/TokenManager.cs` | 取消令牌管理器：监听玩家加入 / 离开与回合重启，维护各类 Cancellati… |
-| `TokenSources` | `Astra.Cancellation` | `src/Astra.Framework/Cancellation/TokenSources.cs` | 各类 CancellationTokenSource 的持有者。 |
-| `EffectApplier` | `Astra.Effects` | `src/Astra.Framework/Effects/EffectApplier.cs` | 批量施加 / 解除 EffectEntry 的入口。 |
-| `EffectCatalog` | `Astra.Effects` | `src/Astra.Framework/Effects/EffectCatalog.cs` | EffectType 与游戏效果类型之间的映射表。 |
-| `EventManager` | `Astra.Events` | `src/Astra.Framework/Events/EventManager.cs` | 自定义事件处理器登记、启停与统一卸载管理器。 |
-| `CustomHumeShieldManager` | `Astra.HumeShield` | `src/Astra.Framework/HumeShield/CustomHumeShieldManager.cs` | 自定义角色的休谟护盾驱动器。 |
-| `CustomItemManager` | `Astra.Items` | `src/Astra.Framework/Items/CustomItemManager.cs` | 自定义物品的模板登记、一次性实例化与原版物品类型映射。 |
-| `VersionGuard` | `Astra.Loader` | `src/Astra.Framework/Loader/VersionGuard.cs` | 版本门禁：按 PatchApiVersionAttribute / PatchG… |
-| `ComponentApplyPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/ComponentApplyPatch.cs` | 为玩家挂载 CustomEffectController：在 Reference… |
-| `CustomTeamDamageMultiplierPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 伤害倍率：让 ProcessDamage 的友伤折扣跟随自定义阵营。 |
-| `CustomTeamExplosionEffectPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 爆炸附加效果（灼烧 / 耳鸣 / 脑震荡）：友军不吃。 |
-| `CustomTeamExplosionFriendlyPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 爆炸伤害：自定义阵营判定为友好时完全免除爆炸伤害。 |
-| `CustomTeamFlashbangFriendlyPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 闪光弹：自定义阵营判定为友好时，不闪光、不耳鸣、不计入命中数。 |
-| `CustomTeamFriendlyFireDetectorPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 让原版「友伤检测（自动处罚）」尊重自定义阵营关系。 |
-| `CustomTeamHostilityPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 用自定义阵营关系接管原版「敌我判定」。 |
-| `CustomTeamScp079CampingPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | SCP-079 扫描器：计算「区域敌人数量」时排除与 SCP 明确友好的阵营。 |
-| `CustomTeamScp079TrackingPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | SCP-079 扫描器：与 SCP 明确友好的自定义阵营不进入 TrackedP… |
-| `CustomTeamScp096GateTranspiler` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | SCP-096 挥击门禁转译：把 ProcessHits 里的 IsEnemy(… |
-| `CustomTeamScp096HitPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | SCP-096 近战：与 SCP 明确友好的阵营不吃 096 的挥击伤害。 |
-| `ExplodeOwnerPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 在 Explode 执行期间记录投掷者，供效果补丁查询。 |
-| `ExplodeOwnerScope` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 爆炸投掷者作用域（栈式，兼容嵌套爆炸）。 |
-| `Shooting` | `Astra.Patches` | `src/Astra.Framework/Patches/ShotBacktrackDataPatch.cs` | Patches ProcessShot. Adds the Shooting e… |
-| `ShotTarget` | `Astra.Patches` | `src/Astra.Framework/Patches/HitscanHitregModuleBasePatch.cs` | Patches ServerApplyDestructibleDamage. A… |
-| `PatchManager` | `Astra.Patching` | `src/Astra.Framework/Patching/PatchManager.cs` | Astra 托管 Harmony 补丁的登记、启停与统一卸载管理器。 |
-| `CustomRoleManager` | `Astra.Roles` | `src/Astra.Framework/Roles/CustomRoleManager.cs` | — |
-| `CustomRoleTemplateManager` | `Astra.Roles` | `src/Astra.Framework/Roles/CustomRoleTemplateManager.cs` | — |
-| `CustomWaveManager` | `Astra.Waves` | `src/Astra.Framework/Waves/CustomWaveManager.cs` | 自定义波次的模板登记、一次性实例化与双向关联维护。 |
-| `CustomWaveRoleSpawner` | `Astra.Waves` | `src/Astra.Framework/Waves/ICustomWaveRoleSpawner.cs` | 波次角色生成器的静态注册点。 |
-
 <!-- AUTO-GEN:END -->
-
-## 4. 维护约定
-
-### 4.1 生成与校验
-
-```bash
-# 仓库根执行；需要 .NET 10 SDK，Roslyn 版本取自 Directory.Packages.props 的中央版本
-dotnet run tools/ApiDoc.cs             # 重新生成 §3 自动段
-dotnet run tools/ApiDoc.cs -- --check  # 只校验：与源码漂移则退出码 1
-```
-
-- 自动段只覆盖 `AUTO-GEN` 标记之间的内容；标记外的手写章节（§1、§2、§4）不会被脚本改写。
-- 生成结果不含时间戳：同一份源码产出同一份字节，diff 只会是真实的 API 变化。
-- 收录口径：`public` 与 `protected` 成员计入（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不计入，内部类型见附录 B。
-
-### 4.2 破坏性变更
-
-| 变更 | 版本 | 额外动作 |
-| --- | --- | --- |
-| 新增公开类型 / 成员 | MINOR | 重新生成 §3 |
-| 删除 / 改名 / 改公开签名 | **MAJOR** | 提交信息标注 `BREAKING`；重新生成 §3，并同步 `docs/STANDARD.md` 中的类型清单 |
-| 仅改内部实现 | PATCH | — |
-
-新增公开 API 前先自问「业务真的需要直接调用它吗」，能 `internal` 就 `internal`（AGENTS.md §6）。
-
-### 4.3 已知文档缺口
-
-- 附录 A 列出的公开类型尚无 XML `<summary>`。AGENTS.md §5.2 要求公开类型必须有文档注释，补齐后重新生成即可从清单移除。
-- 按子系统展开的教程在 `src/Astra.Framework/DEVELOPMENT.md`。该文写于 v2 重构之前（`Astra.Interfaces`、`EventManager.Instance` 等已不存在），与本文冲突时以 §3 清单和源码为准。

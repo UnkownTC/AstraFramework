@@ -41,7 +41,6 @@ namespace Astra;
         /// <inheritdoc />
         public override LoadPriority Priority => LoadPriority.Highest;
 
-        /// <summary>启用时注册框架主管理器。</summary>
         /// <summary>加载配置后同步到静态访问点，供各管理器读取。</summary>
         public override void LoadConfigs()
         {

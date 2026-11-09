@@ -69,7 +69,7 @@ public abstract class CustomWave : IIdentifiable
 
     private readonly List<CustomRole> _roles = [];
 
-    /// <summary>本波次包含的自定义角色（由角色侧的 <see cref="CustomRole.WaveIds"/> 反向填充）。</summary>
+    /// <summary>本波次包含的自定义角色（角色实现 IWaveSpawnRole 时由框架反向登记）。</summary>
     public IReadOnlyList<CustomRole> Roles => _roles;
 
     /// <summary>登记一个归属本波次的角色（框架在波次实例化时调用）。</summary>

@@ -5,7 +5,7 @@
 // 为什么要它：docs/API.md 是「改公开签名时对照」的清单，手抄必然与源码漂移。
 // 本脚本用 Roslyn 语法树扫描 src/Astra.Framework/**/*.cs，把 public / protected 的
 // 类型与成员连同 XML 摘要一并渲染成 Markdown，只替换 docs/API.md 里
-// AUTO-GEN 标记之间的内容，标记之外的正文（用法、维护约定）不受影响。
+// AUTO-GEN 标记之间的内容，标记之外的正文（用法说明）不受影响。
 //
 // 用法（仓库根目录执行，需 .NET 10 SDK；包版本取自 Directory.Packages.props 的中央版本）：
 //   dotnet run tools/ApiDoc.cs                 # 重新生成自动段
@@ -14,7 +14,7 @@
 // 约定：
 //   * 输出必须是确定性的（同源码 → 同字节），故不写入时间戳；内容变化才产生 diff。
 //   * 判定口径见 docs/STANDARD.md §4：public 为对外 API，protected 因可被子类使用同样收录；
-//     internal / private / file / private protected 不属对外 API，只进文末「内部类型」附录。
+//     internal / private / file / private protected 不属对外 API，不收录。
 
 using System;
 using System.Collections.Generic;
@@ -90,7 +90,7 @@ int Run()
 
     File.WriteAllText(docPath, updated, new UTF8Encoding(false));
     Console.WriteLine($"[ApiDoc] 已更新 {Path.GetRelativePath(root, docPath)}："
-        + $"公开类型 {collected.PublicTypes.Count} 个，内部类型 {collected.InternalTypes.Count} 个。");
+        + $"公开类型 {collected.PublicTypes.Count} 个。");
     return 0;
 }
 
@@ -205,8 +205,6 @@ static void HandleType(TypeDeclarationSyntax declaration, string ns, bool parent
 
     if (isPublicApi)
         collected.PublicTypes.Add(info);
-    else if (accessibility == "internal")
-        collected.InternalTypes.Add(info);
 
     foreach (var nested in declaration.Members.OfType<TypeDeclarationSyntax>())
         HandleNested(nested, ns, info.Name, isPublicApi, relativeFile, collected);
@@ -236,8 +234,6 @@ static void HandleNested(TypeDeclarationSyntax declaration, string ns, string pa
 
     if (isPublicApi)
         collected.PublicTypes.Add(info);
-    else if (accessibility == "internal")
-        collected.InternalTypes.Add(info);
 
     foreach (var nested in declaration.Members.OfType<TypeDeclarationSyntax>())
         HandleNested(nested, ns, name, isPublicApi, relativeFile, collected);
@@ -278,8 +274,6 @@ static void HandleEnum(EnumDeclarationSyntax declaration, string ns, bool parent
 
     if (isPublicApi)
         collected.PublicTypes.Add(info);
-    else if (accessibility == "internal")
-        collected.InternalTypes.Add(info);
 }
 
 static void HandleDelegate(DelegateDeclarationSyntax declaration, string ns, bool parentIsPublic, string relativeFile,
@@ -317,8 +311,6 @@ static void HandleDelegate(DelegateDeclarationSyntax declaration, string ns, boo
 
     if (isPublicApi)
         collected.PublicTypes.Add(info);
-    else if (accessibility == "internal")
-        collected.InternalTypes.Add(info);
 }
 
 static void CollectMembers(TypeDeclarationSyntax declaration, TypeInfo info, bool isInterface)
@@ -642,15 +634,6 @@ static string CleanXml(string text)
 
 static string Compress(string text) => DocText.Compress(text);
 
-static string FirstSentence(string text, int maxLength)
-{
-    var end = text.IndexOf('。');
-    var sentence = end > 0 ? text[..(end + 1)] : text;
-    if (sentence.Length <= maxLength)
-        return sentence;
-    return sentence[..maxLength].TrimEnd() + "…";
-}
-
 // ---------------------------------------------------------------- 渲染
 
 static string Render(Collected collected)
@@ -660,15 +643,9 @@ static string Render(Collected collected)
         .ThenBy(type => type.Name, StringComparer.Ordinal)
         .ToList();
 
-    var internalTypes = collected.InternalTypes
-        .OrderBy(type => type.Namespace, StringComparer.Ordinal)
-        .ThenBy(type => type.Name, StringComparer.Ordinal)
-        .ToList();
-
     var builder = new StringBuilder();
 
-    builder.AppendLine("> **自动段**：以下内容由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**。");
-    builder.AppendLine("> 改动公开签名后执行 `dotnet run tools/ApiDoc.cs` 重新生成；评审或 CI 可用 `-- --check` 校验是否漂移。");
+    builder.AppendLine("> 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。");
     builder.AppendLine();
     builder.Append("- **统计**：公开类型 ").Append(publicTypes.Count).Append(" 个（")
         .Append(string.Join(" / ", publicTypes.GroupBy(type => type.Kind)
@@ -677,17 +654,8 @@ static string Render(Collected collected)
         .Append("），命名空间 ").Append(publicTypes.Select(type => type.Namespace).Distinct().Count())
         .Append(" 个；公开成员 ").Append(publicTypes.Sum(type => type.Members.Count)).Append(" 个。").AppendLine();
     builder.Append("- **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；")
-        .Append("`internal` / `private` / `file` / `private protected` 不收录，框架内部类型见附录 B。")
+        .Append("`internal` / `private` / `file` / `private protected` 不收录。")
         .AppendLine();
-
-    var undocumented = publicTypes
-        .Where(type => string.IsNullOrEmpty(type.Summary) && type.Kind != "enum")
-        .ToList();
-    if (undocumented.Count > 0)
-    {
-        builder.Append("- **文档缺口**：").Append(undocumented.Count)
-            .Append(" 个公开类型没有 `<summary>`（清单见附录 A）。").AppendLine();
-    }
 
     builder.AppendLine();
     builder.AppendLine("### 命名空间索引");
@@ -758,48 +726,8 @@ static string Render(Collected collected)
         }
     }
 
-    if (undocumented.Count > 0)
-    {
-        builder.AppendLine("---");
-        builder.AppendLine();
-        builder.AppendLine("### 附录 A：缺 `<summary>` 的公开类型");
-        builder.AppendLine();
-        builder.AppendLine("AGENTS.md §5.2 要求公开类型必须有 XML 文档；以下类型尚未补齐。");
-        builder.AppendLine();
-        foreach (var type in undocumented)
-        {
-            builder.Append("- `").Append(type.Namespace).Append('.').Append(type.Name).Append("` — `")
-                .Append(type.File).Append('`').AppendLine();
-        }
-
-        builder.AppendLine();
-    }
-
-    builder.AppendLine("---");
-    builder.AppendLine();
-    builder.AppendLine("### 附录 B：框架内部类型（`internal`，非对外 API）");
-    builder.AppendLine();
-    if (internalTypes.Count == 0)
-    {
-        builder.AppendLine("（无）");
-    }
-    else
-    {
-        builder.AppendLine("| 类型 | 命名空间 | 源码 | 说明 |");
-        builder.AppendLine("| --- | --- | --- | --- |");
-        foreach (var type in internalTypes)
-        {
-            builder.Append("| `").Append(type.Name).Append("` | `").Append(type.Namespace).Append("` | `")
-                .Append(type.File).Append("` | ")
-                .Append(string.IsNullOrEmpty(type.Summary) ? "—" : EscapeCell(FirstSentence(type.Summary, 40)))
-                .AppendLine(" |");
-        }
-    }
-
     return builder.ToString().TrimEnd();
 }
-
-static string EscapeCell(string text) => text.Replace("|", "\\|", StringComparison.Ordinal);
 
 static int FirstDifference(string left, string right)
 {
@@ -865,7 +793,6 @@ sealed class MemberInfo
 sealed class Collected
 {
     public readonly List<TypeInfo> PublicTypes = new();
-    public readonly List<TypeInfo> InternalTypes = new();
 }
 
 static class DocText
