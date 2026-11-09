@@ -11,3 +11,9 @@ obj/
 
 # 日志
 *.log
+
+# CodeGraph 本地索引（每台机器各自生成，不提交）
+.codegraph/
+
+# 工作区自带的外部记忆库（不提交）
+.dsh-meow/
