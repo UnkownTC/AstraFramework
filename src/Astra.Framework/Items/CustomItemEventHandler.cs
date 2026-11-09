@@ -10,13 +10,14 @@ namespace Astra.Items;
 /// </summary>
 /// <remarks>
 /// 继承 <see cref="EnhancedEventsHandler"/> 复用其 <c>OnExiledShooting</c> 的事件订阅，
-/// 只覆写需要接管的回调。派生类可用 <see cref="CustomItem.OnShooting"/> 阻止原版开火。
+/// 只覆写需要接管的回调。射击默认完全不介入：只有派生类覆写了 <see cref="CustomItem.OnShooting"/>
+/// 的自定义物品才会收到回调，并以其返回值决定是否阻止原版开火。
 /// </remarks>
 [ManagedEvent("Astra - CustomItem")]
 public class CustomItemEventHandler : EnhancedEventsHandler
 {
     /// <summary>
-    /// 射击：玩家手持自定义物品且其 OnShooting 返回 false 时阻止原版开火。
+    /// 射击：仅当自定义物品覆写了 <see cref="CustomItem.OnShooting"/> 时转发，返回 false 则阻止原版开火。
     /// </summary>
     /// <param name="ev">射击事件参数。</param>
     public override void OnExiledShooting(ShootingEventArgs ev)
@@ -28,7 +29,12 @@ public class CustomItemEventHandler : EnhancedEventsHandler
             return;
 
         var custom = CustomItemManager.FindByItem(item) ?? CustomItemManager.FindByItemType(item.Type);
-        if (custom is not null && !custom.OnShooting(ev))
+
+        // 未覆写 OnShooting 的物品不接管射击：框架不介入，原版行为保持不变。
+        if (custom is null || !CustomItemManager.InterceptsShooting(custom))
+            return;
+
+        if (!custom.OnShooting(ev))
             ev.IsAllowed = false;
     }
 }

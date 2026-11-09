@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 using Astra.Teams;
 using Astra.Waves;
@@ -23,6 +25,9 @@ internal static class CustomItemManager
     private static readonly Dictionary<ItemType, CustomItem> ByItemType = new();
 
     private static readonly List<Type> Templates = [];
+
+    /// <summary>每个具体物品类型是否覆写了 <see cref="CustomItem.OnShooting"/> 的缓存。</summary>
+    private static readonly Dictionary<Type, bool> ShootingOverrideCache = [];
 
     /// <summary>物品实例 → 自定义物品定义（用于射击等事件溯源）。</summary>
     private static readonly Dictionary<Item, CustomItem> Tracked = [];
@@ -103,6 +108,32 @@ internal static class CustomItemManager
     internal static CustomItem? FindByItemType(ItemType itemType) =>
         ByItemType.TryGetValue(itemType, out var custom) ? custom : null;
 
+    /// <summary>
+    /// 判断该自定义物品是否接管玩家开火：只有覆写了 <see cref="CustomItem.OnShooting"/> 的类型才算。
+    /// </summary>
+    /// <param name="item">自定义物品定义。</param>
+    /// <returns>覆写了 <see cref="CustomItem.OnShooting"/> 时返回 <see langword="true"/>。</returns>
+    /// <remarks>
+    /// 基类的默认实现只是「放行」，不构成接管。因此未覆写该方法的自定义物品不会进入射击链路，
+    /// 原版射击完全不受影响；是否接管由开发者覆写方法自行选择。
+    /// </remarks>
+    internal static bool InterceptsShooting(CustomItem item)
+    {
+        var type = item.GetType();
+        if (ShootingOverrideCache.TryGetValue(type, out var intercepts))
+            return intercepts;
+
+        var baseMethod = typeof(CustomItem).GetMethod(
+            nameof(CustomItem.OnShooting), BindingFlags.Instance | BindingFlags.Public);
+        intercepts = baseMethod is not null && type.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+            .Any(method => method.Name == nameof(CustomItem.OnShooting)
+                           && method.DeclaringType != typeof(CustomItem)
+                           && method.GetBaseDefinition().Equals(baseMethod));
+
+        ShootingOverrideCache[type] = intercepts;
+        return intercepts;
+    }
+
     /// <summary>登记物品实例与定义的对应关系。</summary>
     /// <param name="item">物品实例。</param>
     /// <param name="custom">自定义定义。</param>
@@ -119,5 +150,6 @@ internal static class CustomItemManager
         Registry.Clear();
         ByItemType.Clear();
         Tracked.Clear();
+        ShootingOverrideCache.Clear();
     }
 }

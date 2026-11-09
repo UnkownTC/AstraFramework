@@ -17,7 +17,8 @@ namespace Astra.Items;
 /// </para>
 /// <list type="bullet">
 /// <item>数值/属性：派生类以属性声明，由使用方自行读取。</item>
-/// <item>事件：<see cref="OnShooting"/> 等虚方法在框架转发事件时调用，可拦截原版行为（返回 <see langword="false"/>）。</item>
+/// <item>事件：<see cref="OnShooting"/> 只在派生类覆写时才会被框架转发——覆写即表示接管开火，
+/// 返回 <see langword="false"/> 阻止原版；不覆写时框架不介入射击，原版行为保持不变。</item>
 /// </list>
 /// </remarks>
 public abstract class CustomItem : IIdentifiable
@@ -42,6 +43,11 @@ public abstract class CustomItem : IIdentifiable
     /// </summary>
     /// <param name="ev">射击事件参数。</param>
     /// <returns>允许原版射击返回 <see langword="true"/>。</returns>
+    /// <remarks>
+    /// <b>覆写本方法即表示由本物品接管开火</b>：框架只对覆写了该方法的自定义物品转发射击事件；
+    /// 不覆写时框架完全不介入，原版射击照常进行。是否拦截玩家射击因此由开发者自行选择，
+    /// 而不是框架的默认行为。
+    /// </remarks>
     public virtual bool OnShooting(ShootingEventArgs ev) => true;
 
     /// <summary>物品被玩家获得时调用。</summary>

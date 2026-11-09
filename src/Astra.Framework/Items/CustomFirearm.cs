@@ -4,8 +4,9 @@ namespace Astra.Items;
 /// 自定义枪械：在 <see cref="CustomItem"/> 之上补充射击数值与开火行为。
 /// </summary>
 /// <remarks>
-/// 数值本身不自动生效——由派生类在 <see cref="OnShooting"/> 中以「阻止原版 + 自建弹道」的方式使用，
-/// 这保证自定义枪械不被原版后坐力/弹匣逻辑干扰。
+/// 数值本身不自动生效——由派生类覆写 <see cref="CustomItem.OnShooting"/>（覆写即接管开火）并返回
+/// <see langword="false"/>，再以「阻止原版 + 自建弹道」的方式使用这些数值，从而避免被原版后坐力/弹匣逻辑干扰。
+/// 不覆写时框架不介入射击，原版行为保持不变。
 /// </remarks>
 public abstract class CustomFirearm : CustomItem
 {
