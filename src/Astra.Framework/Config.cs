@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 using Astra.Attributes;
 using Astra.Enums;
 using Astra.Extensions;
@@ -24,20 +26,21 @@ namespace Astra;
 public class Config
 {
     /// <summary>
+    /// 调试输出开关。
+    /// </summary>
+    /// <remarks>
+    /// 为 <see langword="true"/> 时输出补丁注册/启停等详细日志；默认 <see langword="false"/> 保持控制台干净。
+    /// </remarks>
+    [Description("调试输出开关")]
+    public bool IsDebug { get; set; } = false;
+    /// <summary>
     /// 忽略补丁声明的 LabApi 主版本差异。
     /// </summary>
     /// <remarks>
     /// 默认 <see langword="false"/>：主版本不一致时拒绝登记该补丁并输出 Error。
     /// 置为 <see langword="true"/> 后改为输出 Warning 并继续登记——仅在已确认兼容性时开启。
     /// </remarks>
-    /// <summary>
-    /// 调试输出开关。
-    /// </summary>
-    /// <remarks>
-    /// 为 <see langword="true"/> 时输出补丁注册/启停等详细日志；默认 <see langword="false"/> 保持控制台干净。
-    /// </remarks>
-    public bool IsDebug { get; set; } = false;
-
+    [Description("忽略补丁声明的 LabApi 主版本差异")]
     public bool IgnorePatchApiMajorVersionDiff { get; set; } = false;
 
     /// <summary>
@@ -47,5 +50,6 @@ public class Config
     /// 默认 <see langword="false"/>：主版本不一致时拒绝登记该补丁并输出 Error。
     /// 置为 <see langword="true"/> 后改为输出 Warning 并继续登记——仅在已确认兼容性时开启。
     /// </remarks>
+    [Description("忽略补丁声明的游戏主版本差异")]
     public bool IgnorePatchGameMajorVersionDiff { get; set; } = false;
 }
