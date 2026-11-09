@@ -57,7 +57,7 @@
 | --- | --- | --- | --- |
 | 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`）。阵营归属读 `Team`（`TeamRef`，同时兼容自定义阵营与原版阵营） |
 | 自定义阵营 | `CustomTeam` | 查询 `CustomTeamApi.Teams` / `Find` / `Find<T>` | 一次性实例化、跨回合复用，可直接持有实例引用 |
-| 自定义波次 | `CustomWave`（声明 `Id` / `Name` / `Teams`）；角色侧实现 `IWaveSpawnRole` 声明归属波次与数量 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`CustomWaveApi.SetRoleSpawner`）；执行 `CustomWaveApi.Spawn(wave, players)` | 波次刷新表由角色聚合，波次本身不维护数量；未注册生成器时 `Spawn` 记 Error 并返回空 |
+| 自定义波次 | `CustomWave`（声明 `Id` / `Name` / `Teams`）；角色侧实现 `IWaveSpawnRole` 声明归属波次与数量 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`CustomWaveApi.SetRoleSpawner`）；执行 `CustomWaveApi.Spawn(wave, players)` | 波次刷新表由角色聚合，波次本身不维护数量；主阵营读 `Team`（`TeamRef`，兼容自定义/原版阵营）；未注册生成器时 `Spawn` 记 Error 并返回空 |
 | 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火 |
 | 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明 |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
@@ -1457,7 +1457,7 @@
 - `public abstract string Id { get; }`
 - `public abstract string Name { get; }`
 - `public IReadOnlyDictionary<string, int> Table { get; }` — 刷新配置：自定义角色 Id → 数量（-1 表示填充剩余玩家）。
-- `public virtual CustomTeam? Team { get; }` — 波次的主阵营（取 Teams 首个）；为空时不参与自定义敌我关系。
+- `public virtual TeamRef Team { get; }` — 波次的主阵营：自定义阵营优先，未声明时回落到原版 OtherAlive。
 - `public virtual IReadOnlyList<CustomTeam> Teams { get; }` — 本波次归属的自定义阵营实例列表。
 - `public IReadOnlyList<CustomRole> Roles { get; }` — 本波次包含的自定义角色（角色实现 IWaveSpawnRole 时由框架反向登记）。
 - `public virtual bool ModifyThreat { get; }` — 是否参与设施威胁指数调整。
@@ -1466,7 +1466,7 @@
 - `public virtual float SpawnProtectDuration { get; }` — 出生保护时长（秒）；-1 表示使用框架默认值。
 - `public virtual string? Announcement { get; }` — Announcer 播报正文；null 表示不播报。
 - `public virtual string? AnnouncementTranslation { get; }` — Announcer 播报的翻译键或译文；null 表示不翻译。
-- `public virtual Color WaveColor { get; }` — 波次配色，默认取 Team 的配色。
+- `public virtual Color WaveColor { get; }` — 波次配色：取主阵营中自定义阵营的配色，无自定义阵营时为白色。
 - `protected virtual float DefaultSpawnProtectDuration { get; }` — 默认出生保护时长（秒）。
 - `public virtual IReadOnlyList<Player> Spawn(IEnumerable<Player> players)` — 按 Table 把玩家分配到各角色并套用。
 - `public virtual bool CheckAllowSpawn(Player player)` — 判断玩家是否允许被本波次刷新。

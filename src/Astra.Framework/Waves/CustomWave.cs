@@ -54,9 +54,16 @@ public abstract class CustomWave : IIdentifiable
         }
     }
 
-    /// <summary>波次的主阵营（取 <see cref="Teams"/> 首个）；为空时不参与自定义敌我关系。</summary>
-    /// <remarks>仅用于配色与播报兜底；完整归属见 <see cref="Teams"/>。</remarks>
-    public virtual CustomTeam? Team => Teams.Count > 0 ? Teams[0] : null;
+    /// <summary>
+    /// 波次的主阵营：自定义阵营优先，未声明时回落到原版 <see cref="PlayerRoles.Team.OtherAlive"/>。
+    /// </summary>
+    /// <remarks>
+    /// 与角色一致，用 <see cref="TeamRef"/> 同时承载自定义阵营与原版阵营；完整归属见 <see cref="Teams"/>。
+    /// 需要固定原版阵营的波次直接覆写本属性返回 <see cref="PlayerRoles.Team"/> 即可（隐式转换）。
+    /// </remarks>
+    public virtual TeamRef Team => Teams.Count > 0
+        ? TeamRef.FromCustom(Teams[0])
+        : TeamRef.FromVanilla(PlayerRoles.Team.OtherAlive);
 
     /// <summary>
     /// 本波次归属的自定义阵营实例列表。
@@ -98,8 +105,8 @@ public abstract class CustomWave : IIdentifiable
     /// <summary>Announcer 播报的翻译键或译文；<see langword="null"/> 表示不翻译。</summary>
     public virtual string? AnnouncementTranslation => null;
 
-    /// <summary>波次配色，默认取 <see cref="Team"/> 的配色。</summary>
-    public virtual Color WaveColor => Team?.TeamColor ?? Color.white;
+    /// <summary>波次配色：取主阵营中自定义阵营的配色，无自定义阵营时为白色。</summary>
+    public virtual Color WaveColor => Team.CustomTeam?.TeamColor ?? Color.white;
 
     /// <summary>
     /// 按 <see cref="Table"/> 把玩家分配到各角色并套用。
