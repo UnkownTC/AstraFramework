@@ -1,10 +1,6 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Astra.Framework/Astra.Framework.csproj">
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
-    <Project Path="src/Astra.Analyzers/Astra.Analyzers.csproj">
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
+    <Project Path="src/Astra.Framework/Astra.Framework.csproj" Id="588e9f10-bfb2-4560-9394-a84c352c2010" />
+    <Project Path="src/Astra.Analyzers/Astra.Analyzers.csproj" />
   </Folder>
 </Solution>

@@ -20,6 +20,19 @@ python tools/vsbuild.py src/Astra.Framework/Astra.Framework.csproj -p:Configurat
 
 `net481` 工程必须用完整的 .NET Framework MSBuild（`dotnet build` 对 COM 引用会报 MSB4803），因此统一走 `tools/vsbuild.py`。
 
+## 产物位置
+
+所有编译输出与中间文件统一收进 `artifacts/`，项目目录下不再产生 `bin/` `obj/`：
+
+| 类型 | 路径 |
+|---|---|
+| 主程序集 | `artifacts/build/Astra.Framework/<Platform>/<Configuration>/Astra.Framework.dll` |
+| 分析器 | `artifacts/build/Astra.Analyzers/[<Platform>/]<Configuration>/netstandard2.0/Astra.Analyzers.dll` |
+| 中间产物 | `artifacts/obj/<项目>/[<Platform>/]<Configuration>/` |
+| 构建日志 | `artifacts/logs/vsbuild-<时间戳>.log` |
+
+`artifacts/` 已在 `.gitignore` 中忽略；发布时从 `artifacts/build/...` 取 DLL。
+
 ## 设计要点
 
 - **按域内聚**：`Astra.Roles` / `Astra.Teams` / `Astra.Waves` / `Astra.Items` … 一个域一个命名空间
