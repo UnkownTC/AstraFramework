@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `1.0.0`（`Directory.Build.props`） |
+| 适用版本 | `2.0.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -55,7 +55,7 @@
 
 | 我要做… | 继承 / 实现 | 用哪个入口 | 要点 |
 | --- | --- | --- | --- |
-| 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`） |
+| 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`）。阵营归属读 `Team`（`TeamRef`，同时兼容自定义阵营与原版阵营） |
 | 自定义阵营 | `CustomTeam` | 查询 `CustomTeamApi.Teams` / `Find` / `Find<T>` | 一次性实例化、跨回合复用，可直接持有实例引用 |
 | 自定义波次 | `CustomWave`（声明 `Id` / `Name` / `Teams`）；角色侧实现 `IWaveSpawnRole` 声明归属波次与数量 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`CustomWaveApi.SetRoleSpawner`）；执行 `CustomWaveApi.Spawn(wave, players)` | 波次刷新表由角色聚合，波次本身不维护数量；未注册生成器时 `Spawn` 记 Error 并返回空 |
 | 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火 |
@@ -74,7 +74,7 @@
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 89 个（class 62 / enum 8 / interface 16 / struct 3），命名空间 19 个；公开成员 575 个。
+- **统计**：公开类型 90 个（class 62 / enum 8 / interface 16 / struct 4），命名空间 19 个；公开成员 588 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -98,7 +98,7 @@
 | `Astra.Patching` | `IManualPatch`、`PatchApi`、`PatchStatus` |
 | `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`StandardRole` |
 | `Astra.ServerSpecificSettings` | `ServerSpecificSettingBase`、`ServerSpecificSettingManager` |
-| `Astra.Teams` | `CustomTeam`、`CustomTeamApi`、`CustomTeamRelation`、`CustomTeamResolver`、`RelationEntry`、`RelationEntryKind` |
+| `Astra.Teams` | `CustomTeam`、`CustomTeamApi`、`CustomTeamRelation`、`CustomTeamResolver`、`RelationEntry`、`RelationEntryKind`、`TeamRef` |
 | `Astra.Waves` | `CustomWave`、`CustomWaveApi`、`DelegatedWaveSorter<T>`、`ICustomWaveRoleSpawner`、`IWaveSorter<in T>`、`IWaveSpawnRole`、`WaveComposition`、`WaveSorterExtensions` |
 
 ---
@@ -1235,8 +1235,7 @@
 - `public virtual bool ClearInventory { get; set; }`
 - `public bool IsDestroyed { get; private set; }`
 - `public virtual string RoleColor { get; }` — 角色配色，由 RoleType 推导，只读。
-- `public virtual CustomTeam? CustomTeam { get; }` — 角色所属的自定义阵营；为 null 时沿用原版阵营关系。
-- `public virtual Team Team { get; }` — 角色所属阵营，由 RoleType 推导，只读。
+- `public virtual TeamRef Team { get; }` — 角色所属阵营：自定义阵营优先，未声明时由 RoleType 推导原版阵营。
 - `public bool Check(Player player)` — 判断指定玩家当前是否持有本角色（按 Id 比对）。
 - `protected virtual void OnAdded(Player player)`
 - `protected virtual void OnRemoved(Player player)`
@@ -1419,6 +1418,29 @@
 - `Team` — 原版阵营（如 SCPs）。
 - `Faction` — 原版派系（如 SCP）。
 - `CustomTeam` — 自定义阵营 Id。
+
+#### `TeamRef`
+
+`public readonly struct TeamRef : IEquatable<TeamRef>`
+
+源码：`src/Astra.Framework/Teams/TeamRef.cs`
+
+> 阵营引用：把「自定义阵营」与「原版阵营」收敛到同一种值类型，供角色等组件统一表达阵营归属。
+
+- `public TeamRef(CustomTeam? customTeam, Team vanillaTeam)` — 用自定义阵营（可选）与原版阵营构造阵营引用。
+- `public CustomTeam? CustomTeam { get; }` — 自定义阵营；为 null 表示只使用原版阵营。
+- `public Team VanillaTeam { get; }` — 原版阵营：自定义阵营存在时为其声明的 VanillaTeam 锚点。
+- `public bool IsCustom { get; }` — 是否由自定义阵营接管。
+- `public static TeamRef FromVanilla(Team team)` — 用原版阵营构造阵营引用。
+- `public static TeamRef FromCustom(CustomTeam team)` — 用自定义阵营构造阵营引用，原版阵营取其锚点。
+- `public bool Equals(TeamRef other)`
+- `public override bool Equals(object? obj)`
+- `public override int GetHashCode()`
+- `public override string ToString()`
+- `public static implicit operator TeamRef(Team team)` — 原版阵营隐式转换为阵营引用。
+- `public static implicit operator TeamRef(CustomTeam team)` — 自定义阵营隐式转换为阵营引用。
+- `public static bool operator ==(TeamRef left, TeamRef right)` — 比较两个阵营引用是否相同（自定义阵营按实例、原版阵营按枚举值）。
+- `public static bool operator !=(TeamRef left, TeamRef right)` — 比较两个阵营引用是否不同。
 
 
 ### `Astra.Waves`

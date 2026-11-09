@@ -51,15 +51,12 @@ namespace Astra.Roles;
         public virtual string RoleColor => '#' + ColorUtility.ToHtmlStringRGBA(RoleType.GetRoleColor());
 
         /// <summary>
-        /// 角色所属的自定义阵营；为 <see langword="null"/> 时沿用原版阵营关系。
+        /// 角色所属阵营：自定义阵营优先，未声明时由 <see cref="RoleType"/> 推导原版阵营。
         /// </summary>
         /// <remarks>
-        /// 仅影响敌我判定（伤害是否走友伤系统），不改变原版 <see cref="Team"/> 的显示与计分。
+        /// 仅影响敌我判定（伤害是否走友伤系统），不改变原版 <see cref="PlayerRoles.Team"/> 的显示与计分。
         /// </remarks>
-        public virtual CustomTeam? CustomTeam => null;
-
-        /// <summary>角色所属阵营，由 <see cref="RoleType"/> 推导，只读。</summary>
-        public virtual Team Team => RoleType.GetTeam();
+        public virtual TeamRef Team => RoleType.GetTeam();
 
         /// <summary>判断指定玩家当前是否持有本角色（按 <see cref="Id"/> 比对）。</summary>
         /// <param name="player">待判断的玩家，可为 <see langword="null"/>。</param>

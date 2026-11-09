@@ -27,7 +27,7 @@
 | `Astra` | 插件入口与配置 | `AstraPlugin`、`Configuration` |
 | `Astra.Loader` | 启动引导、自动注册、版本守卫 | `AutoRegister`(i)、`VersionGuard`(i) |
 | `Astra.Roles` | 自定义角色 | `CustomRole`、`StandardRole`、`CustomRoleManager`、`CustomRoleTemplateManager`(i) |
-| `Astra.Teams` | 自定义阵营 | `CustomTeam`、`CustomTeamManager`、`TeamRelation`、`RelationEntry` |
+| `Astra.Teams` | 自定义阵营 | `CustomTeam`、`CustomTeamApi`、`CustomTeamResolver`、`CustomTeamRelation`、`RelationEntry`、`TeamRef` |
 | `Astra.Waves` | 自定义波次 | `CustomWave`、`CustomWaveManager`、`IWaveRoleSpawner` |
 | `Astra.Items` | 自定义物品 | `CustomItem`、`CustomFirearm`、`CustomMicroHid`、`CustomJailbird`、`CustomParticleDisruptor`、`CustomItemManager` |
 | `Astra.Effects` | 效果系统 | `CustomEffect`、`EffectEntry`、`EffectType`、`EffectApplier`、`EffectCatalog`(i) |
@@ -60,9 +60,11 @@ src/Astra.Framework/
 │   └── CustomRoleTemplateManager.cs  (internal)
 ├── Teams/                            → Astra.Teams
 │   ├── CustomTeam.cs
-│   ├── CustomTeamManager.cs
+│   ├── CustomTeamApi.cs
+│   ├── CustomTeamResolver.cs
 │   ├── CustomTeamRelation.cs
-│   └── RelationEntry.cs
+│   ├── RelationEntry.cs
+│   └── TeamRef.cs
 ├── Waves/                            → Astra.Waves
 │   ├── CustomWave.cs
 │   ├── CustomWaveManager.cs
@@ -107,7 +109,7 @@ src/Astra.Framework/
 | 基类与契约 | `CustomRole`、`StandardRole`、`CustomTeam`、`CustomWave`、`CustomItem` 及四个派生基类、`CustomEffect`、`CustomAbility`、`StandardAbility` |
 | 接口 | `IWaveRoleSpawner`、`ICustomHumeShieldStat`、`ICustomHumeShieldBlocker`、`IIdentifiable`、`IAbilityRole`、`IEffects`、`IKeybind`、`ICooldown`、`ICallOnRegister`、`ICallOnUnregister` |
 | 管理器 | `CustomRoleManager`、`CustomTeamManager`、`CustomWaveManager`、`CustomItemManager`、`CustomAbilityManager`、`CustomHumeShieldManager`、`PatchManager`、`EventManager`、`EffectApplier`、`HintManager`、`AudioManager`、`CountdownManager` |
-| 值对象 / DTO | `EffectEntry`、`RelationEntry`、`CustomTeamRelation`、`PatchStatus`、`EventHandlerStatus`、`WaveComposition` |
+| 值对象 / DTO | `EffectEntry`、`RelationEntry`、`TeamRef`、`CustomTeamRelation`、`PatchStatus`、`EventHandlerStatus`、`WaveComposition` |
 | 事件 | `PlayerEvents`、全部 `*EventArgs` |
 | 标注与枚举 | `Astra.Attributes.*`、`Astra.Enums.*` |
 
@@ -228,7 +230,8 @@ Astra                     AstraPlugin / Config / IIdentifiable / ICustomContent
 Astra.Loader              AutoRegister / VersionGuard / IdentifiableManager / MonoSingleton
 Astra.Roles               CustomRole / StandardRole / CustomRoleManager / CustomRoleApi
                           CustomRoleTemplateManager(i) / IOriginalRole / ICallOnRegister(i)
-Astra.Teams               CustomTeam / CustomTeamManager / CustomTeamResolver / RelationEntry
+Astra.Teams               CustomTeam / CustomTeamApi / CustomTeamResolver / CustomTeamRelation
+                          RelationEntry / RelationEntryKind / TeamRef
 Astra.Waves               CustomWave / CustomWaveManager / IWaveRoleSpawner / IWaveSorter
 Astra.Items               CustomItem / CustomFirearm / CustomMicroHid / CustomJailbird
                           CustomParticleDisruptor / CustomItemManager / CustomItemApi

@@ -33,7 +33,7 @@ public static class CustomTeamResolver
         if (player is null)
             return null;
 
-        return CustomRoleManager.TryGetCustomRole(player, out var role) ? role.CustomTeam : null;
+        return CustomRoleManager.TryGetCustomRole(player, out var role) ? role.Team.CustomTeam : null;
     }
 
     /// <summary>取得玩家的原版阵营。</summary>

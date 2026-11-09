@@ -205,6 +205,7 @@
     <Compile Include="Teams\CustomTeamRelation.cs" />
     <Compile Include="Teams\CustomTeamResolver.cs" />
     <Compile Include="Teams\RelationEntry.cs" />
+    <Compile Include="Teams\TeamRef.cs" />
     <Compile Include="Waves\CustomWave.cs" />
     <Compile Include="Waves\CustomWaveApi.cs" />
     <Compile Include="Waves\CustomWaveManager.cs" />
