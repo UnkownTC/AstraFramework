@@ -1,21 +1,3 @@
-using Astra;
-using Astra.Attributes;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.Loader;
-
 namespace Astra.ServerSpecificSettings;
     /// <summary>
     /// 服务器专属设置（ServerSpecificSettings）的抽象基类。

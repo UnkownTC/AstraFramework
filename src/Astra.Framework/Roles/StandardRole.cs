@@ -1,37 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using Astra;
+using Astra.Abilities;
 using Astra.Effects;
 using Astra.Enums;
 using Astra.Extensions;
-using Astra.Abilities;
+using Astra.HumeShield;
 
-using CustomPlayerEffects;
-
-using Discord;
-
-using LabApi.Features.Console;
 using LabApi.Features.Wrappers;
 
-using Mirror;
-
 using UnityEngine;
-using Astra.Attributes;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
 
 namespace Astra.Roles;
 

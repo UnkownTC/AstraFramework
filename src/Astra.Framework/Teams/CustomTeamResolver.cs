@@ -4,23 +4,6 @@ using LabApi.Features.Wrappers;
 
 using PlayerRoles;
 
-using Astra;
-using Astra.Attributes;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
-
 namespace Astra.Teams;
 
 /// <summary>把玩家映射到自定义阵营，并计算双方敌对关系。</summary>

@@ -8,29 +8,14 @@ using LabApi.Events.CustomHandlers;
 using LabApi.Features.Wrappers;
 
 namespace Astra.Cancellation;
-    // 命名空间与 System.Threading.CancellationTokenSource 同名冲突，别名需放在命名空间声明内部。
-    using CancellationTokenSource = System.Threading.CancellationTokenSource;
-using Astra;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
+// 命名空间与 System.Threading.CancellationTokenSource 同名冲突，别名需放在命名空间声明内部。
+using CancellationTokenSource = System.Threading.CancellationTokenSource;
 
-    /// <summary>
-    /// 取消令牌管理器：监听玩家加入 / 离开与回合重启，维护各类 <see cref="CancellationTokenSource"/>。
-    /// 通过 <see cref="ManagedEventAttribute"/> 自动注册为事件处理器。
-    /// </summary>
-    [ManagedEvent("Astra - CancellationTokenManager")]
+/// <summary>
+/// 取消令牌管理器：监听玩家加入 / 离开与回合重启，维护各类 <see cref="CancellationTokenSource"/>。
+/// 通过 <see cref="ManagedEventAttribute"/> 自动注册为事件处理器。
+/// </summary>
+[ManagedEvent("Astra - CancellationTokenManager")]
     internal class TokenManager : CustomEventsHandler
     {
         /// <summary>取消所有令牌并重建令牌源（框架禁用时调用）。</summary>

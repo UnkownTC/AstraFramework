@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 
-using Astra;
 using Astra.Attributes;
 
 using JetBrains.Annotations;
@@ -13,21 +12,6 @@ using LabApi.Features.Wrappers;
 using UserSettings.ServerSpecific;
 
 using ServerSpecificSettingBase = UserSettings.ServerSpecific.ServerSpecificSettingBase;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
 
 // ReSharper disable MemberCanBePrivate.Global
 

@@ -1,30 +1,12 @@
 using System;
 using System.Collections.Generic;
 
-using Astra;
-
 using LabApi.Events.Arguments.PlayerEvents;
 using LabApi.Events.Handlers;
 using LabApi.Features.Wrappers;
 
 
 using UnityEngine;
-using Astra.Attributes;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
 
 namespace Astra.Effects;
     /// <summary>

@@ -1,30 +1,11 @@
 using System;
 using System.Collections.Generic;
 
-using Astra;
-using Astra.Teams;
-
-using LabApi.Features.Console;
+using Astra.Waves;
 
 using PlayerRoles;
 
 using UnityEngine;
-using Astra.Attributes;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
 
 namespace Astra.Teams;
 

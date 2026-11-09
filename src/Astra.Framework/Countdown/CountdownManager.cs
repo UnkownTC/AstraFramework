@@ -6,22 +6,6 @@ using Astra.Loader;
 using UnityEngine;
 
 using Logger = LabApi.Features.Console.Logger;
-using Astra;
-using Astra.Attributes;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
 
 namespace Astra.Countdown;
     /// <summary>

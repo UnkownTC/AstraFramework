@@ -15,32 +15,15 @@ using UnityEngine;
 // ReSharper disable MemberCanBePrivate.Global
 
 namespace Astra.Events;
-    using BaseFirearm = InventorySystem.Items.Firearms.Firearm;
-    using Player = LabApi.Features.Wrappers.Player;
-using Astra;
-using Astra.Attributes;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
 
-    /// <summary>
-    /// Contains all information before a player fires a weapon.
-    /// ClaimedTarget and Player transform values are modified by <see cref="PlayerRoles.FirstPersonControl.FpcBacktracker"/> according to <see cref="ShotBacktrackData"/> sent by the Player and do not match the actual values.
-    /// </summary>
-    public class ShootingEventArgs : System.EventArgs, IPlayerEvent, IFirearmItemEvent, IItemEvent, ICancellableEvent
+using BaseFirearm = InventorySystem.Items.Firearms.Firearm;
+using Player = LabApi.Features.Wrappers.Player;
+
+/// <summary>
+/// Contains all information before a player fires a weapon.
+/// ClaimedTarget and Player transform values are modified by <see cref="PlayerRoles.FirstPersonControl.FpcBacktracker"/> according to <see cref="ShotBacktrackData"/> sent by the Player and do not match the actual values.
+/// </summary>
+public class ShootingEventArgs : System.EventArgs, IPlayerEvent, IFirearmItemEvent, IItemEvent, ICancellableEvent
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ShootingEventArgs" /> class.

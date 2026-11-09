@@ -1,24 +1,5 @@
 using System;
 
-using Astra.Countdown;
-using Astra;
-using Astra.Attributes;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
-
 namespace Astra.Countdown;
     /// <summary>
     /// 倒计时系统对外静态 API，内部委托给 <see cref="CountdownManager"/> 单例。

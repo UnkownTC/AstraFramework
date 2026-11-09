@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 
-using Astra;
-
 using CustomPlayerEffects;
 
 using LabApi.Features.Wrappers;
@@ -14,22 +12,6 @@ using PlayerStatsSystem;
 using UnityEngine;
 
 using Object = UnityEngine.Object;
-using Astra.Attributes;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
 
 namespace Astra.HumeShield;
 

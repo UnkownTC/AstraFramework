@@ -4,26 +4,11 @@ using System.Linq;
 using System.Reflection;
 
 using Astra.Attributes;
-using Astra;
 using Astra.Loader;
 
 using HarmonyLib;
 
 using Logger = LabApi.Features.Console.Logger;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Teams;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
 
 namespace Astra.Patching;
     /// <summary>Astra 托管 Harmony 补丁的登记、启停与统一卸载管理器。</summary>

@@ -5,34 +5,18 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 using Astra.Attributes;
-using Astra;
 using Astra.Teams;
 
-using PlayerRoles;
-using PlayerRoles.PlayableScps.Scp096;
-
 using Footprinting;
-
-using PlayerStatsSystem;
 
 using HarmonyLib;
 
 using InventorySystem.Items.ThrowableProjectiles;
-using Astra.Enums;
-using Astra.Extensions;
-using Astra.Roles;
-using Astra.Waves;
-using Astra.Items;
-using Astra.Effects;
-using Astra.Abilities;
-using Astra.HumeShield;
-using Astra.Patching;
-using Astra.Hints;
-using Astra.Audio;
-using Astra.Countdown;
-using Astra.Cancellation;
-using Astra.ServerSpecificSettings;
-using Astra.Loader;
+
+using PlayerRoles;
+using PlayerRoles.PlayableScps.Scp096;
+
+using PlayerStatsSystem;
 
 namespace Astra.Patches;
 
