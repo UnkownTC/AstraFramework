@@ -5,7 +5,7 @@
 ## 结构
 
 ```
-src/Astra.Framework/     主程序集（唯一 DLL）
+src/Astra.Framework/     主程序集（唯一 DLL，按域分目录：Roles/Teams/Waves/Items/Effects/...）
 src/Astra.Analyzers/     Roslyn 分析器（约束契约与用法）
 libs/                    只读依赖（游戏与 LabAPI 的公开化程序集）
 tools/vsbuild.py         构建入口（VS MSBuild 包装，net481 必需）

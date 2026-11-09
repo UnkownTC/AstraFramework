@@ -6,8 +6,6 @@
 // -----------------------------------------------------------------------
 
 using Astra.Attributes;
-using Astra.Events;
-using Astra.Events.EventArgs;
 
 using HarmonyLib;
 
@@ -17,9 +15,27 @@ using InventorySystem.Items.Firearms.Modules.Misc;
 using PlayerRoles;
 
 using PlayerStatsSystem;
+using Astra;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
+using PlayerEvents = Astra.Events.PlayerEvents;
+using ShotEventArgs = Astra.Events.ShotEventArgs;
 
-namespace Astra.Patches
-{
+namespace Astra.Patches;
     /// <summary>
     /// Patches <see cref="HitscanHitregModuleBase.ServerApplyDestructibleDamage" />.
     /// Adds the <see cref="PlayerEvents.Shot" /> event.
@@ -74,4 +90,4 @@ namespace Astra.Patches
             return false; // 已完整复制原方法逻辑,跳过原始方法
         }
     }
-}
+

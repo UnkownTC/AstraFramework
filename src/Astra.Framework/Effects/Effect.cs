@@ -1,9 +1,25 @@
 using System;
 
 using Astra.Enums;
-using Astra.Systems.CustomEffectSystem;
+using Astra.Effects;
 
 using CustomPlayerEffects;
+using Astra;
+using Astra.Attributes;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 
 namespace Astra.Effects;
 

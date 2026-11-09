@@ -14,10 +14,27 @@ using UnityEngine;
 
 // ReSharper disable MemberCanBePrivate.Global
 
-namespace Astra.Events.EventArgs
-{
+namespace Astra.Events;
     using BaseFirearm = InventorySystem.Items.Firearms.Firearm;
     using Player = LabApi.Features.Wrappers.Player;
+using Astra;
+using Astra.Attributes;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 
     /// <summary>
     /// Contains all information before a player fires a weapon.
@@ -80,4 +97,4 @@ namespace Astra.Events.EventArgs
         /// </summary>
         public bool IsAllowed { get; set; } = true;
     }
-}
+

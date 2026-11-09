@@ -4,9 +4,25 @@ using LabApi.Events.CustomHandlers;
 using LabApi.Features;
 using LabApi.Loader.Features.Plugins;
 using LabApi.Loader.Features.Plugins.Enums;
+using Astra.Attributes;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 
-namespace Astra
-{
+namespace Astra;
     /// <summary>
     /// Azure Framework（晴空框架）的 LabAPI 插件入口。
     /// 加载优先级为 <see cref="LoadPriority.Highest"/>，确保框架基础设施先于依赖它的插件就绪。
@@ -67,4 +83,4 @@ namespace Astra
             AutoRegister.UnregisterAll();
         }
     }
-}
+

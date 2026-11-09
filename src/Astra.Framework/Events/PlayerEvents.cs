@@ -1,9 +1,26 @@
-using Astra.Events.EventArgs;
+using Astra.Events;
 
 using LabApi.Events;
+using Astra;
+using Astra.Attributes;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 
-namespace Astra.Events
-{
+namespace Astra.Events;
     /// <summary>
     /// 框架扩展的玩家事件集合（射击相关）。
     /// 事件由 IL 织入的补丁触发，用法与 LabAPI 静态事件一致。
@@ -28,4 +45,4 @@ namespace Astra.Events
             Shot.InvokeEvent(ev);
         }
     }
-}
+

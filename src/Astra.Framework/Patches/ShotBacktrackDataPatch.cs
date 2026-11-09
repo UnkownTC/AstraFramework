@@ -8,16 +8,32 @@
 using System;
 
 using Astra.Attributes;
-using Astra.Events;
-using Astra.Events.EventArgs;
 
 using HarmonyLib;
 
 using InventorySystem.Items.Firearms;
 using InventorySystem.Items.Firearms.Modules.Misc;
+using Astra;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
+using PlayerEvents = Astra.Events.PlayerEvents;
+using ShootingEventArgs = Astra.Events.ShootingEventArgs;
 
-namespace Astra.Patches
-{
+namespace Astra.Patches;
     /// <summary>
     /// Patches <see cref="ShotBacktrackData.ProcessShot" />.
     /// Adds the <see cref="PlayerEvents.Shooting" /> event.
@@ -53,4 +69,4 @@ namespace Astra.Patches
             return true; // 让 ProcessShot 正常执行,事件在其回溯上下文内的调用点触发
         }
     }
-}
+

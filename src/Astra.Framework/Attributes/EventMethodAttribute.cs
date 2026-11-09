@@ -4,9 +4,25 @@ using System.Reflection;
 using HarmonyLib;
 
 using JetBrains.Annotations;
+using Astra;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 
-namespace Astra.Attributes
-{
+namespace Astra.Attributes;
     /// <summary>
     /// 将标注的方法（或委托）自动订阅到指定的 .NET 事件。
     /// 框架在自动注册阶段通过 <see cref="AccessTools.DeclaredEvent"/> 解析目标事件并完成订阅，
@@ -47,4 +63,4 @@ namespace Astra.Attributes
         /// <summary>被订阅的方法信息。</summary>
         internal MethodInfo SubscriberMethodInfo { get; set; }
     }
-}
+

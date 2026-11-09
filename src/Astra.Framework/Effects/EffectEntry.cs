@@ -2,12 +2,26 @@ using System;
 using System.Collections.Concurrent;
 using System.Reflection;
 
-using Astra.Abstractions;
+using Astra;
 using Astra.Enums;
 using Astra.Extensions;
-using Astra.Systems.CustomEffectSystem;
+using Astra.Effects;
 
 using LabApi.Features.Wrappers;
+using Astra.Attributes;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 
 namespace Astra.Effects;
 

@@ -17,9 +17,26 @@ using LabApi.Events.Arguments.Interfaces;
 using LabApi.Features.Wrappers;
 
 using UnityEngine;
+using Astra;
+using Astra.Attributes;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 
-namespace Astra.Events.EventArgs
-{
+namespace Astra.Events;
     /// <summary>
     /// Contains all information after a player has fired a weapon.
     /// </summary>
@@ -114,4 +131,4 @@ namespace Astra.Events.EventArgs
         /// </summary>
         public bool CanSpawnImpactEffects { get; set; } = true;
     }
-}
+

@@ -1,7 +1,24 @@
 using System;
+using Astra;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
+using EventManager = Astra.Events.EventManager;
 
-namespace Astra.Attributes
-{
+namespace Astra.Attributes;
     /// <summary>
     /// 标记一个组件「仅登记、不自动注册」。
     /// <para>应用于事件处理器类时：框架会实例化并记录它，但不会自动调用
@@ -12,4 +29,4 @@ namespace Astra.Attributes
     public class DisableAutoRegisterAttribute : Attribute
     {
     }
-}
+

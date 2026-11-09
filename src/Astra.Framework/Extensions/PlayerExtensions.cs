@@ -1,11 +1,25 @@
-using Astra.Abstractions;
-using Astra.Systems.CustomAbilitySystem;
+using Astra;
+using Astra.Abilities;
 
 using LabApi.Features.Wrappers;
+using Astra.Attributes;
+using Astra.Enums;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 // ReSharper disable MemberCanBePrivate.Global
 
-namespace Astra.Extensions
-{
+namespace Astra.Extensions;
     /// <summary>
     /// 针对 <see cref="Player"/> 的技能相关扩展方法。
     /// </summary>
@@ -38,4 +52,4 @@ namespace Astra.Extensions
             return player.TryGetAbilityManager(out var manager) && manager.TryGetAbility(settingId, out ability);
         }
     }
-}
+

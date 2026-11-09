@@ -3,9 +3,25 @@ using Astra.Attributes;
 using HarmonyLib;
 
 using LabApi.Features.Wrappers;
+using Astra;
+using Astra.Enums;
+using Astra.Extensions;
+using Astra.Roles;
+using Astra.Teams;
+using Astra.Waves;
+using Astra.Items;
+using Astra.Effects;
+using Astra.Abilities;
+using Astra.HumeShield;
+using Astra.Patching;
+using Astra.Hints;
+using Astra.Audio;
+using Astra.Countdown;
+using Astra.Cancellation;
+using Astra.ServerSpecificSettings;
+using Astra.Loader;
 
-namespace Astra.Systems.CustomEffectSystem
-{
+namespace Astra.Patches;
     /// <summary>
     /// 为玩家挂载 <see cref="CustomEffectController"/>：在 <c>ReferenceHub.Awake</c> 之后追加组件并绑定宿主。
     /// </summary>
@@ -29,4 +45,4 @@ namespace Astra.Systems.CustomEffectSystem
             __instance.gameObject.AddComponent<CustomEffectController>().Bind(player);
         }
     }
-}
+

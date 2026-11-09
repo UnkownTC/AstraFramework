@@ -214,3 +214,44 @@ src/Astra.Framework/
 | 1 | `Astra.Testing` 首发 | 首发，提供 Fake 基类 |
 | 2 | 管理器是否需要实例化版本 | 保持 `static`（与现状一致，改动最小） |
 | 3 | `Astra.Runtime`（运行时上下文）是否单列 | 暂不单列，入口类型留在 `Astra` |
+
+---
+
+## 11. 实施记录（v2.1，2026-11-09）
+
+洗牌已落地，实际结构如下（与上文 §3 表格一致，差异见「偏差」）。
+
+### 11.1 实际命名空间（20 个）
+
+```
+Astra                     AstraPlugin / Config / IIdentifiable / ICustomContent
+Astra.Loader              AutoRegister / VersionGuard / IdentifiableManager / MonoSingleton
+Astra.Roles               CustomRole / StandardRole / CustomRoleManager / CustomRoleApi
+                          CustomRoleTemplateManager(i) / IOriginalRole / ICallOnRegister(i)
+Astra.Teams               CustomTeam / CustomTeamManager / CustomTeamResolver / RelationEntry
+Astra.Waves               CustomWave / CustomWaveManager / IWaveRoleSpawner / IWaveSorter
+Astra.Items               CustomItem / CustomFirearm / CustomMicroHid / CustomJailbird
+                          CustomParticleDisruptor / CustomItemManager / CustomItemApi
+Astra.Effects             CustomEffect / EffectEntry / EffectApplier / EffectCatalog(i)
+Astra.Abilities           CustomAbility / StandardAbility / CustomAbilityManager
+Astra.HumeShield          ICustomHumeShieldStat / CustomHumeShieldManager
+Astra.Patching            PatchManager / PatchStatus / IManualPatch / Patch*Attribute
+Astra.Events              PlayerEvents / ShootingEventArgs / EventManager / EnhancedEventsHandler
+Astra.Hints / Audio / Countdown / Cancellation / ServerSpecificSettings
+Astra.Enums / Attributes / Extensions
+Astra.Patches             框架自带补丁（internal 类）
+```
+
+### 11.2 偏差说明
+
+| 偏差 | 原因 | 后续 |
+|---|---|---|
+| 保留 `XxxApi` 便捷静态类（域内，薄封装） | 管理器语义各有不同（`CustomTeam` 曾是抽象类承载静态表），完全合并需要拆静态成员，风险高 | 可在 1.1 合并进 Manager |
+| `Astra.Patches` 与 `Astra.Patching` 并存 | 前者是框架自带补丁实现，后者是补丁机制 | 可改名为 `Astra.Patches.BuiltIn` |
+| 未做 `internal` 全量收敛 | 先保证结构正确，可见性审计分阶段 | P4 单独提交 |
+
+### 11.3 已知待办
+
+1. `CustomTeam` 静态成员迁入 `CustomTeamManager`，删除 `CustomTeamApi`
+2. 可见性审计：`AutoRegister` / `VersionGuard` / 模板管理器收敛为 `internal`
+3. Analyzer 新增 AST6101（跨域静态依赖）与 AST6102（public 泄漏 internal）
