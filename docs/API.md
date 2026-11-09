@@ -62,7 +62,7 @@
 | 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明 |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
 | 休谟护盾 | `ICustomHumeShieldStat`（`StandardRole` 已实现） | 随角色套用自动接管生灭 | `HumeShieldCurve` 非空时以曲线为准 |
-| 事件处理 | `CustomEventsHandler`；需要射击扩展事件时用 `EnhancedEventsHandler` | 自动注册（见 §1.3）；状态与启停用 `EventApi` | 角色 / 技能的事件在模板实例上回调 |
+| 事件处理 | `CustomEventsHandler`；需要射击扩展事件时用 `EnhancedEventsHandler` | 自动注册（见 §1.3）；状态与启停用 `EventApi` | 角色 / 技能的事件在模板实例上回调；`[EventMethod]` 的方法可标注多个、订阅多个签名一致的事件，重复声明同一事件会自动去重（只触发一次） |
 | Harmony 补丁 | 类级 `[ManagedPatch]` + `[HarmonyPatch]` 或 `IManualPatch`；方法级 `[PatchMethod]` | 启停 `PatchApi.Enable` / `Disable`；状态 `PatchApi.TryGetStatus` | 可用 `[PatchApiVersion]` / `[PatchGameVersion]` 做版本门禁，`Config` 里有两个忽略开关 |
 | 提示 / 音频 / 倒计时 | — | `HintApi` / `AudioApi` / `CountdownApi` | 均按字符串 Id 精确控制；音频在回合重启时自动归还播放器到对象池 |
 | 取消令牌 | — | `CancellationTokenApi` + `CancellationTokenCategory` | 按类别随玩家加入 / 离开、回合重启统一取消 |
@@ -807,7 +807,7 @@
 
 > 事件方法管理器：负责将带 EventMethodAttribute 的方法订阅到对应 .NET 事件， 并在框架禁用时统一取消订阅。
 
-- `public static void Register(object? instance)`
+- `public static void Register(object? instance)` — 扫描实例的公开方法，把带 EventMethodAttribute 的实例方法订阅到其声明的事件。 静态方法不在此处理，统一由 AutoRegister 按类型扫描注册。
 - `public static void Register(MethodInfo methodInfo, object? instance = null)` — 将指定方法订阅到其 EventMethodAttribute 声明的所有事件。
 - `public static void Unregister(MethodInfo methodInfo, [CanBeNull] EventInfo eventInfo = null)` — 取消订阅指定方法（可选按事件过滤）。
 - `public static void UnregisterAll()` — 取消订阅所有已登记的事件方法。

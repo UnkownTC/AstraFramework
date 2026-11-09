@@ -184,10 +184,12 @@ namespace Astra
 
             // 静态 [EventMethod] 方法没有实例，只能在此按类型扫描注册；
             // 实例方法由 EnhancedEventsHandler 构造函数自我注册，这里必须跳过。
+            // 用 IsDefined 而不是单数 GetCustomAttribute：一个方法允许标注多个 [EventMethod]，
+            // 单数重载在 AllowMultiple 下会抛 AmbiguousMatchException。
             foreach (var eventMethod in type.GetMethods(
                          BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
             {
-                if (eventMethod.GetCustomAttribute<EventMethodAttribute>() is not null)
+                if (eventMethod.IsDefined(typeof(EventMethodAttribute), inherit: false))
                     EventMethodManager.Register(eventMethod);
             }
         }
