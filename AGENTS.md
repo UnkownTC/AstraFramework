@@ -28,6 +28,7 @@ AstraFramework 是 SCP: Secret Laboratory 服务端框架库（LabAPI 之上）�
 | `src/Astra.Analyzers/` | Roslyn 分析器（AST 系列规则） | 改规则时 |
 | `libs/` | 只读依赖（游戏与 LabAPI 公开化程序集） | 需要新引用时 |
 | `tools/vsbuild.py` | 构建入口（net481 必需） | 每次构建 |
+| `tools/ApiDoc.cs` | `docs/API.md` 自动段生成器（Roslyn 扫描公开 API） | 改公开签名后 |
 | `artifacts/` | 构建日志与产物（不提交） | 排查失败时 |
 
 ---

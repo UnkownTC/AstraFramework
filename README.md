@@ -9,7 +9,7 @@ src/Astra.Framework/     主程序集（唯一 DLL，按域分目录：Roles/Tea
 src/Astra.Analyzers/     Roslyn 分析器（约束契约与用法）
 libs/                    只读依赖（游戏与 LabAPI 的公开化程序集）
 tools/vsbuild.py         构建入口（VS MSBuild 包装，net481 必需）
-docs/                    STANDARD / API / DEPLOY
+docs/                    STANDARD（架构规范）/ API（公开 API 速查）
 ```
 
 ## 构建
@@ -40,7 +40,7 @@ python tools/vsbuild.py src/Astra.Framework/Astra.Framework.csproj -p:Configurat
 - **调用一跳**：业务 → 管理器，无门面层
 - 无 `Systems` / `Abstractions` / `Apis` 分层命名空间
 
-详见 [docs/STANDARD.md](docs/STANDARD.md)。
+详见 [docs/STANDARD.md](docs/STANDARD.md)；对外类型与成员的完整清单见 [docs/API.md](docs/API.md)。
 
 ## 版本
 

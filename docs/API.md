@@ -1,0 +1,1622 @@
+# AstraFramework 公开 API 速查
+
+| 项 | 值 |
+|---|---|
+| 适用版本 | `1.0.0`（`Directory.Build.props`） |
+| 面向 | 写业务插件的人；改框架公开签名的人 |
+| 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2、§4 手写，与源码冲突时以源码为准 |
+
+**怎么读**
+
+- 要用框架做事 → §1 看框架在什么时机、按什么规则接管你的类型；§2 按需求查该继承谁、走哪个入口。
+- 要改框架 → 先在 §3 确认类型/成员是否属于对外 API；删除或改签名即破坏性变更（AGENTS.md §6），改完重新生成 §3。
+
+## 1. 加载与自动注册
+
+### 1.1 入口与生命周期
+
+`AstraPlugin : Plugin<Config>` 是唯一入口，`Priority = LoadPriority.Highest`，保证框架基础设施先于依赖它的插件就绪。
+
+| 阶段 | 行为 |
+| --- | --- |
+| `Enable()` | 把 `MainManager` 注册为 LabAPI 事件处理器；`Config` 同步到静态访问点 `AstraPlugin.Configuration`，并回写默认配置 |
+| `OnServerPluginsEnabled()` | 全部插件启用后触发一次 `AutoRegister.RegisterAll(PluginLoader.Plugins.Values)`；`Initialized` 保证幂等，单个类型失败只记日志、不中断 |
+| `Disable()` | 注销 `MainManager` 并调用 `AutoRegister.UnregisterAll()`，回收事件、设置、补丁、令牌、事件方法，并清空 Team / Wave / Item 注册表 |
+
+### 1.2 注册顺序
+
+`AutoRegister` 先收集模板，再按依赖顺序实例化：
+
+1. **Team**：`CustomTeam.Initialize()`
+2. **Wave**：`CustomWaveManager.Initialize()`（需要阵营实例；波次会把自身反向登记到阵营）
+3. **Item**：`CustomItemManager.Initialize()`
+4. **Role**：`CustomRoleTemplateManager.RegisterRole()` + `CustomWaveManager.AttachRole()`（需要波次实例；实现 `IWaveSpawnRole` 的角色在此挂到波次）
+5. `ServerSpecificSettingManager.SendToAll()` 统一下发服务器专属设置
+
+### 1.3 判定矩阵
+
+`AutoRegister.RegisterType` 对扫描到的每个类型按序判定：
+
+| 类型 / 成员特征 | 注册动作 |
+| --- | --- |
+| 非抽象、实现 `IIdentifiable`，且继承 `CustomEventsHandler` | 注册为事件处理器；**但**同时实现 `ICustomContent` 的角色/技能模板例外，由各自的模板管理器以「唯一模板实例」注册，避免同一类型被构造两次 |
+| 实现 `IIdentifiable` 且继承 `ServerSpecificSettingBase` | `ServerSpecificSettingManager.Register` |
+| 实现 `IIdentifiable` 且继承 `CustomAbility` | `CustomAbilityTemplateManager.RegisterAbility` |
+| 实现 `IIdentifiable` 且继承 `CustomRole` / `CustomWave` / `CustomTeam` / `CustomItem` | 收集，按 §1.2 顺序注册为模板 |
+| 类上标 `[ManagedEvent("id")]`（且前面未作为事件注册过） | 注册为事件处理器，用于没有 `IIdentifiable` 的类 |
+| 类上标 `[ManagedPatch]`，且有 `[HarmonyPatch]` 或实现 `IManualPatch` | 由 `PatchManager.PatchType` 托管 |
+| 静态方法上标 `[PatchMethod(...)]` | 方法级补丁，无需外层类再标 `[ManagedPatch]` |
+| 静态方法上标 `[EventMethod(...)]` | 由 `EventMethodManager` 订阅到目标 .NET 事件；实例方法由 `EnhancedEventsHandler` 在构造时自注册 |
+| 类上标 `[DisableAutoRegister]` | 只登记、不启用：事件处理器用 `EventApi.Enable(id)`、补丁用 `PatchApi.Enable(id)` 手动启用 |
+
+> 模板由 `Activator.CreateInstance` 实例化，派生类需要公开无参构造；每个玩家拿到的是 `CreateInstance()` 出来的独立副本，模板实例本身只承载「类型级」信息。
+
+## 2. 扩展点速查
+
+| 我要做… | 继承 / 实现 | 用哪个入口 | 要点 |
+| --- | --- | --- | --- |
+| 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`） |
+| 自定义阵营 | `CustomTeam` | 查询 `CustomTeamApi.Teams` / `Find` / `Find<T>` | 一次性实例化、跨回合复用，可直接持有实例引用 |
+| 自定义波次 | `CustomWave`（声明 `Id` / `Name` / `Teams`）；角色侧实现 `IWaveSpawnRole` 声明归属波次与数量 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`CustomWaveApi.SetRoleSpawner`）；执行 `CustomWaveApi.Spawn(wave, players)` | 波次刷新表由角色聚合，波次本身不维护数量；未注册生成器时 `Spawn` 记 Error 并返回空 |
+| 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过） |
+| 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明 |
+| 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
+| 休谟护盾 | `ICustomHumeShieldStat`（`StandardRole` 已实现） | 随角色套用自动接管生灭 | `HumeShieldCurve` 非空时以曲线为准 |
+| 事件处理 | `CustomEventsHandler`；需要射击扩展事件时用 `EnhancedEventsHandler` | 自动注册（见 §1.3）；状态与启停用 `EventApi` | 角色 / 技能的事件在模板实例上回调 |
+| Harmony 补丁 | 类级 `[ManagedPatch]` + `[HarmonyPatch]` 或 `IManualPatch`；方法级 `[PatchMethod]` | 启停 `PatchApi.Enable` / `Disable`；状态 `PatchApi.TryGetStatus` | 可用 `[PatchApiVersion]` / `[PatchGameVersion]` 做版本门禁，`Config` 里有两个忽略开关 |
+| 提示 / 音频 / 倒计时 | — | `HintApi` / `AudioApi` / `CountdownApi` | 均按字符串 Id 精确控制；音频在回合重启时自动归还播放器到对象池 |
+| 取消令牌 | — | `CancellationTokenApi` + `CancellationTokenCategory` | 按类别随玩家加入 / 离开、回合重启统一取消 |
+| 服务器专属设置 | `ServerSpecificSettingBase` | 实现 `IIdentifiable` 即自动登记，启动后统一下发 | 技能按键复用其中的 SSKeybindSetting |
+
+## 3. 公开 API 清单
+
+<!-- AUTO-GEN:BEGIN（由 tools/ApiDoc.cs 生成，勿手改） -->
+
+> **自动段**：以下内容由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**。
+> 改动公开签名后执行 `dotnet run tools/ApiDoc.cs` 重新生成；评审或 CI 可用 `-- --check` 校验是否漂移。
+
+- **统计**：公开类型 89 个（class 62 / enum 8 / interface 16 / struct 3），命名空间 19 个；公开成员 575 个。
+- **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录，框架内部类型见附录 B。
+- **文档缺口**：12 个公开类型没有 `<summary>`（清单见附录 A）。
+
+### 命名空间索引
+
+| 命名空间 | 公开类型 |
+| --- | --- |
+| `Astra` | `AstraPlugin`、`AutoRegister`、`Config`、`ICustomContent`、`IIdentifiable`、`MainManager` |
+| `Astra.Abilities` | `CustomAbility`、`CustomAbilityApi`、`CustomAbilityManager`、`IAbilityRole`、`ICooldown`、`IKeybind`、`IPlayerCondition`、`StandardAbility` |
+| `Astra.Attributes` | `DisableAutoRegisterAttribute`、`EventMethodAttribute`、`ManagedEventAttribute`、`ManagedPatchAttribute`、`PatchApiVersionAttribute`、`PatchGameVersionAttribute`、`PatchMethodAttribute` |
+| `Astra.Audio` | `AudioApi` |
+| `Astra.Cancellation` | `CancellationTokenApi` |
+| `Astra.Countdown` | `CountdownApi`、`CountdownManager` |
+| `Astra.Effects` | `CustomEffect`、`CustomEffectApi`、`CustomEffectController`、`CustomEffectHandler`、`Effect`、`EffectEntry`、`IEffects` |
+| `Astra.Enums` | `AbilityFailReason`、`CancellationTokenCategory`、`EffectClassification`、`EffectType`、`HintPosition`、`KeybindType` |
+| `Astra.Events` | `EnhancedEventsHandler`、`EventApi`、`EventHandlerStatus`、`EventMethodManager`、`PlayerEvents`、`ShootingEventArgs`、`ShotEventArgs` |
+| `Astra.Extensions` | `MapExtensions`、`PlayerEffectExtensions`、`PlayerExtensions` |
+| `Astra.Hints` | `HintApi`、`HintManager`、`HintPositionMapping` |
+| `Astra.HumeShield` | `CustomHumeShieldApi`、`CustomHumeShieldEventHandler`、`ICustomHumeShieldBlocker`、`ICustomHumeShieldStat` |
+| `Astra.Items` | `CustomFirearm`、`CustomItem`、`CustomItemApi`、`CustomItemEventHandler`、`CustomJailbird`、`CustomMicroHid`、`CustomParticleDisruptor` |
+| `Astra.Loader` | `ICallOnRegister`、`ICallOnUnregister`、`IdentifiableManager<T>`、`MonoSingleton<T>` |
+| `Astra.Patching` | `IManualPatch`、`PatchApi`、`PatchStatus` |
+| `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`StandardRole` |
+| `Astra.ServerSpecificSettings` | `ServerSpecificSettingBase`、`ServerSpecificSettingManager` |
+| `Astra.Teams` | `CustomTeam`、`CustomTeamApi`、`CustomTeamRelation`、`CustomTeamResolver`、`RelationEntry`、`RelationEntryKind` |
+| `Astra.Waves` | `CustomWave`、`CustomWaveApi`、`DelegatedWaveSorter<T>`、`ICustomWaveRoleSpawner`、`IWaveSorter<in T>`、`IWaveSpawnRole`、`WaveComposition`、`WaveSorterExtensions` |
+
+---
+
+### `Astra`
+
+#### `AstraPlugin`
+
+`public class AstraPlugin : Plugin<Config>`
+
+源码：`src/Astra.Framework/AstraPlugin.cs`
+
+> Azure Framework（晴空框架）的 LabAPI 插件入口。 加载优先级为 Highest，确保框架基础设施先于依赖它的插件就绪。
+
+- `public static Config Configuration { get; private set; }` — 当前生效的框架配置。
+- `public override string Author { get; }`
+- `public override string Name { get; }`
+- `public override string Description { get; }`
+- `public override Version Version { get; }`
+- `public override Version RequiredApiVersion { get; }`
+- `public override LoadPriority Priority { get; }`
+- `public override void LoadConfigs()` — 启用时注册框架主管理器。
+- `public override void Enable()`
+- `public override void Disable()` — 禁用时注销主管理器并销毁所有自动注册的资源。
+
+#### `AutoRegister`
+
+`public static class AutoRegister`
+
+源码：`src/Astra.Framework/Loader/AutoRegister.cs`
+
+> 自动注册核心：扫描所有已加载插件程序集，按类型自动注册事件处理器、补丁、技能、设置与事件方法。 单个程序集或类型的注册失败只记录日志，不会中断其余组件的注册。
+
+- `public static bool RegisterAll(IEnumerable<Assembly> assemblies)` — 扫描并注册所有组件。幂等：重复调用返回 false。
+- `public static void UnregisterAll()` — 注销所有自动注册的资源（事件、设置、补丁、令牌、事件方法）。
+
+#### `Config`
+
+`public class Config`
+
+源码：`src/Astra.Framework/Config.cs`
+
+> 晴空框架的配置文件模型（与插件目录下的 config.yml 对应）。
+
+- `public bool IsDebug { get; set; }` — 调试输出开关。
+- `public bool IgnorePatchApiMajorVersionDiff { get; set; }` — 忽略补丁声明的 LabApi 主版本差异。
+- `public bool IgnorePatchGameMajorVersionDiff { get; set; }` — 忽略补丁声明的游戏主版本差异。
+
+#### `ICustomContent`
+
+`public interface ICustomContent : IIdentifiable`
+
+源码：`src/Astra.Framework/ICustomContent.cs`
+
+（无公开成员）
+
+#### `IIdentifiable`
+
+`public interface IIdentifiable`
+
+源码：`src/Astra.Framework/IIdentifiable.cs`
+
+> 表示一个具有全局唯一字符串标识（Id）的组件。 实现该接口的类型可被框架通过 Id 精确注册、注销与查找。
+
+- `string Id { get; }` — 获取该组件的全局唯一标识。
+
+#### `MainManager`
+
+`public class MainManager : CustomEventsHandler`
+
+源码：`src/Astra.Framework/Loader/MainManager.cs`
+
+> 框架主管理器：在服务器插件全部启用后触发一次自动注册流程。
+
+- `public override void OnServerPluginsEnabled()`
+
+
+### `Astra.Abilities`
+
+#### `CustomAbility`
+
+`public abstract class CustomAbility : CustomEventsHandler, IIdentifiable`
+
+源码：`src/Astra.Framework/Abilities/CustomAbility.cs`
+
+> 自定义技能的抽象基类。 继承该类并实现 Id 即可注册为全局技能模板， 框架会为每个玩家创建独立的技能实例并管理其生命周期。
+
+- `public abstract string Id { get; }` — 获取技能的全局唯一标识。
+- `public int AssignedSettingId { get; internal set; }` — 该实例实际生效的 SettingId 覆盖值；-1 表示沿用模板声明的 SettingId。 仅在把技能授予玩家且模板 SettingId 与该玩家既有按键冲突时由框架改写， **只作用于当前玩家专属实例，模板自身不受影响**。
+- `public int EffectiveSettingId { get; }` — 获取该实例实际生效的 SettingId：已改配则返回改配值，否则回落到模板的 SettingId（非按键技能恒为 -1）。
+- `public virtual string Name { get; }` — 获取技能的显示名称。
+- `public virtual string Description { get; }` — 获取技能的描述。
+- `protected Player Owner { get; set; }` — 技能当前归属的玩家。
+- `protected virtual void OnAdded(Player player)` — 技能被添加到玩家时调用。
+- `protected virtual void OnRemoved(Player player)` — 技能从玩家移除时调用。
+- `protected virtual void OnTriggered(Player player)` — 技能被触发时调用。
+- `public override bool Equals(object obj)`
+- `public override int GetHashCode()`
+- `public virtual CustomAbility CreateInstance()` — 基于当前模板创建一个技能实例。默认使用反射无参构造，可覆写以自定义实例化逻辑。
+
+#### `CustomAbilityApi`
+
+`public static class CustomAbilityApi`
+
+源码：`src/Astra.Framework/Abilities/CustomAbilityApi.cs`
+
+> 自定义技能对外静态 API，提供技能模板与玩家技能实例的查询能力。
+
+- `public static IReadOnlyCollection<CustomAbility> AbilityTemplates { get; }` — 获取当前已注册的全部技能模板。
+- `public static bool TryGetAbilityTemplate(string id, out CustomAbility ability)` — 按 Id 获取全局技能模板。
+- `public static bool TryGetAbilityTemplate(Type type, out CustomAbility ability)` — 按类型获取全局技能模板。
+- `public static bool TryGetAbilityTemplate<T>(out T ability) where T : CustomAbility, new()` — 按泛型类型获取全局技能模板。
+- `public static bool TryGetAbilityManager(Player player, out CustomAbilityManager manager)` — 获取指定玩家的技能管理器。
+- `public static bool TryGetPlayerAbility<T>(Player player, out T ability) where T : CustomAbility, new()` — 按泛型类型获取指定玩家的技能实例。
+- `public static bool TryGetPlayerAbility(Player player, string id, out CustomAbility ability)` — 按 Id 获取指定玩家的技能实例。
+- `public static bool TryGetPlayerAbility(Player player, int settingId, out CustomAbility ability)` — 按 SettingId 获取指定玩家的技能实例。
+
+#### `CustomAbilityManager`
+
+`public sealed class CustomAbilityManager : CustomEventsHandler, IDisposable`
+
+源码：`src/Astra.Framework/Abilities/CustomAbilityManager.cs`
+
+> 单个玩家的技能管理器：负责该玩家技能实例的增删查与触发。 每个玩家在加入服务器时由框架创建一个实例，离开时释放。
+
+- `public CustomAbilityManager(Player owner)` — 初始化技能管理器。
+- `public Player Owner { get; }` — 归属玩家。
+- `public IReadOnlyCollection<CustomAbility> Abilities { get; }` — 该玩家当前拥有的所有技能。
+- `public int AbilityCount { get; }` — 技能总数。
+- `public int KeybindAbilityCount { get; }` — 按键技能总数。
+- `public bool TryGetAbility<T>(out T ability) where T : CustomAbility` — 按泛型类型获取技能实例。
+- `public bool TryGetAbility(string id, out CustomAbility ability)` — 按 Id 获取技能实例。
+- `public bool TryGetAbility(int settingId, out CustomAbility ability)` — 按 SettingId 获取技能实例。
+- `public void TriggerAbility<T>() where T : CustomAbility` — 按泛型类型触发技能。
+- `public void TriggerAbility(string id)` — 按 Id 触发技能。
+- `public void TriggerAbility(int settingId)` — 按 SettingId 触发技能。
+- `public static bool TryGetAbilityManager(Player player, out CustomAbilityManager manager)` — 获取指定玩家的技能管理器。
+- `public static CustomAbilityManager GetAbilityManager(Player player)` — 获取指定玩家的技能管理器（不存在时返回 null）。
+- `public static void AddManager(Player player)` — 为指定玩家创建并初始化技能管理器。
+- `public static void RemoveManager(Player player)` — 移除并释放指定玩家的技能管理器。
+- `public void Init()` — 将管理器登记到全局表。
+- `public void ClearAll()` — 清空该玩家的所有技能。
+- `public CustomAbility AddAbility<T>() where T : CustomAbility, new()` — 按泛型类型添加技能实例。
+- `public CustomAbility AddAbility(string id)` — 按 Id 添加技能实例。
+- `public void RemoveAbility(string id)` — 按 Id 移除技能。
+- `public void RemoveAbility<T>() where T : CustomAbility` — 按泛型类型移除技能。
+- `public static void ProcessUserInput(ReferenceHub hub, ServerSpecificSettingBase settings)` — 处理玩家的按键设置输入，触发对应技能的 KeyDown / KeyUp。 通过 EventMethodAttribute 订阅到 ServerOnSettingValueReceived。
+- `public void Dispose()` — 释放管理器：清空技能并从全局表移除。
+
+#### `IAbilityRole`
+
+`public interface IAbilityRole`
+
+源码：`src/Astra.Framework/Abilities/IAbilityRole.cs`
+
+- `CustomAbility[] Abilities { get; }`
+
+#### `ICooldown`
+
+`public interface ICooldown`
+
+源码：`src/Astra.Framework/Abilities/ICooldown.cs`
+
+> 表示一个带有冷却时间的能力。
+
+- `bool IsReady { get; }` — 获取能力当前是否处于可用（冷却已结束）状态。
+- `double CooldownTime { get; }` — 获取冷却时长（秒）。
+- `double Remaining { get; }` — 获取剩余冷却时间（秒）。
+- `AbilityCooldown Cooldown { get; }` — 获取底层冷却对象。
+- `void TriggerCooldown(double cooldown)` — 触发一次冷却。
+
+#### `IKeybind`
+
+`public interface IKeybind`
+
+源码：`src/Astra.Framework/Abilities/IKeybind.cs`
+
+> 表示一个通过按键触发的能力。
+
+- `int SettingId { get; }` — 获取该能力绑定的服务器专属设置 SettingId（对应 SSKeybindSetting）。
+- `KeybindType KeybindType { get; }` — 获取按键触发类型（按下 / 按住）。
+- `bool SyncIsPressed { get; set; }` — 获取或设置按键当前是否被按下。
+- `void KeyDown()` — 按键按下时调用。
+- `void KeyUp()` — 按键松开时调用。
+
+#### `IPlayerCondition`
+
+`public interface IPlayerCondition`
+
+源码：`src/Astra.Framework/Abilities/ICondition.cs`
+
+> 表示一个带有玩家触发条件的能力。
+
+- `Func<Player, bool> Condition { get; }` — 获取用于判断能力是否可用的玩家条件委托。
+
+#### `StandardAbility`
+
+`public abstract class StandardAbility : CustomAbility, IKeybind, ICooldown, IPlayerCondition`
+
+源码：`src/Astra.Framework/Abilities/StandardAbility.cs`
+
+> 标准技能的抽象基类：在 CustomAbility 基础上集成按键（IKeybind）、 冷却（ICooldown）与玩家条件（IPlayerCondition）。
+
+- `public virtual int SettingId { get; }` — 获取技能绑定的服务器专属设置 SettingId（对应 SSKeybindSetting）。 已降级为兜底值：正常情况下框架会在技能加入玩家时按「技能槽顺序」 自动分配并写入 AssignedSettingId，本声明值仅在 槽位耗尽（该玩家技能数超过 CustomAbilityManager.MaxAbilitySlots）时生效。 -1 表示该技能没有按键绑定，适用于仅提供元数据的占位技能（不参与槽位分配）。
+- `public virtual Func<Player, bool> Condition { get; protected set; }` — 获取或设置触发条件（默认始终为 true）。
+- `public virtual KeybindType KeybindType { get; }` — 获取按键触发类型（默认按下触发）。
+- `public bool SyncIsPressed { get; set; }` — 获取或设置按键当前是否被按下。
+- `public bool IsReady { get; }` — 获取技能是否就绪（冷却结束且条件满足）。
+- `public double Remaining { get; }` — 获取剩余冷却时间（秒）。
+- `public AbilityCooldown Cooldown { get; }` — 获取底层冷却对象。
+- `public virtual double CooldownTime { get; set; }` — 获取或设置冷却时长（秒）；默认值为 0（无冷却）。
+- `public void KeyUp()` — 按键松开时调用。
+- `protected virtual void OnKeyUp(Player player)` — 按键松开后的扩展钩子。
+- `public void KeyDown()` — 按键按下时调用。
+- `protected virtual void OnKeyDown(Player player)` — 按键按下后的扩展钩子。
+- `protected virtual void OnTriggerFailed(Player player, AbilityFailReason failReason)` — 触发失败时的扩展钩子。
+- `public virtual void TriggerCooldown(double cooldown)` — 触发一次冷却。
+- `public virtual StringBuilder AbilityStringBuilder(StringBuilder stringBuilder)` — 将技能的显示状态写入 StringBuilder（形如 "[名称] 已就绪"）。
+
+
+### `Astra.Attributes`
+
+#### `DisableAutoRegisterAttribute`
+
+`public class DisableAutoRegisterAttribute : Attribute`
+
+特性：`[AttributeUsage(AttributeTargets.Class, Inherited = false)]`
+
+源码：`src/Astra.Framework/Attributes/DisableAutoRegisterAttribute.cs`
+
+> 标记一个组件「仅登记、不自动注册」。 应用于事件处理器类时：框架会实例化并记录它，但不会自动调用 CustomHandlersManager.RegisterEventsHandler，需之后通过 EventManager.RegisterHandler 手动启用。 应用于补丁类时：补丁仅被登记，不立即应用，需之后通过 PatchManager.Patch 手动启用。
+
+（无公开成员）
+
+#### `EventMethodAttribute`
+
+`public class EventMethodAttribute : Attribute`
+
+特性：`[AttributeUsage(AttributeTargets.Method | AttributeTargets.Delegate, AllowMultiple = true, Inherited = true)]`
+
+源码：`src/Astra.Framework/Attributes/EventMethodAttribute.cs`
+
+> 将标注的方法（或委托）自动订阅到指定的 .NET 事件。 框架在自动注册阶段通过 DeclaredEvent 解析目标事件并完成订阅， 框架禁用时自动取消订阅。
+
+- `public EventMethodAttribute(Type eventType, string eventName)` — 初始化事件订阅特性（静态事件）。
+
+#### `ManagedEventAttribute`
+
+`public class ManagedEventAttribute : Attribute`
+
+特性：`[AttributeUsage(AttributeTargets.Class)]`
+
+源码：`src/Astra.Framework/Attributes/ManagedEventAttribute.cs`
+
+> 将事件处理器类纳入框架自动注册，并以指定的 Id 作为该处理器的标识。 主要用于未实现 IIdentifiable 的处理器类； 若类同时实现了 IIdentifiable，则以接口返回的 Id 优先。
+
+- `public ManagedEventAttribute(string id)` — 初始化 ManagedEventAttribute 并指定事件处理器 Id。
+- `public string Id { get; }` — 获取事件处理器的唯一标识。
+
+#### `ManagedPatchAttribute`
+
+`public class ManagedPatchAttribute : Attribute`
+
+特性：`[AttributeUsage(AttributeTargets.Class, Inherited = false)]`
+
+源码：`src/Astra.Framework/Attributes/ManagedPatchAttribute.cs`
+
+> 标记一个类为框架托管的 Harmony 补丁。 需配合 HarmonyPatch（声明式）或 IManualPatch（手动式）使用， 由框架在自动注册阶段统一应用，并在框架禁用时统一卸载。
+
+（无公开成员）
+
+#### `PatchApiVersionAttribute`
+
+`public class PatchApiVersionAttribute : Attribute`
+
+特性：`[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]`
+
+源码：`src/Astra.Framework/Attributes/PatchApiVersionAttribute.cs`
+
+- `public Version ApiVersion { get; }`
+
+#### `PatchGameVersionAttribute`
+
+`public class PatchGameVersionAttribute : Attribute`
+
+特性：`[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]`
+
+源码：`src/Astra.Framework/Attributes/PatchGameVersionAttribute.cs`
+
+- `public string GameVersion { get; }`
+- `public int MajorVersion { get; }`
+- `public int MinorVersion { get; }`
+- `public int RevisionVersion { get; }`
+- `public string VersionSuffix { get; }`
+
+#### `PatchMethodAttribute`
+
+`public sealed class PatchMethodAttribute : Attribute`
+
+特性：`[AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = false)]`
+
+源码：`src/Astra.Framework/Attributes/PatchMethodAttribute.cs`
+
+> 标记一个**静态方法**为框架托管的方法级 Harmony 补丁。
+
+- `public PatchMethodAttribute(Type targetType, string targetMethodName) : this(targetType, targetMethodName, MethodType.Normal, Type.EmptyTypes)` — 按类型与成员名声明目标（无参数）。
+- `public PatchMethodAttribute(Type targetType, string targetMethodName, params Type[] parameterTypes) : this(targetType, targetMethodName, MethodType.Normal, parameterTypes ?? Type.EmptyTypes)` — 按类型、成员名与参数类型声明目标。
+- `public PatchMethodAttribute(Type targetType, string targetMethodName, MethodType methodType) : this(targetType, targetMethodName, methodType, Type.EmptyTypes)` — 按类型、成员名与成员种类声明目标。
+- `public PatchMethodAttribute(Type targetType, MethodType methodType, params Type[] parameterTypes) : this(targetType, null, methodType, parameterTypes ?? Type.EmptyTypes)` — 按类型与成员种类声明目标。
+- `public PatchMethodAttribute(Type targetType, params Type[] parameterTypes) : this(targetType, null, MethodType.Constructor, parameterTypes ?? Type.EmptyTypes)` — 按类型声明构造函数目标。
+- `public PatchMethodAttribute(Type targetType) : this(targetType, null, MethodType.Constructor, Type.EmptyTypes)` — 按类型声明无参构造函数目标。
+- `public PatchMethodAttribute(string typeName, string targetMethodName, MethodType methodType = MethodType.Normal) : this(FindType(typeName) ?? throw new ArgumentException($"找不到类型 {typeName}", nameof(typeName)), targetMethodName, methodType, Type.EmptyTypes)` — 按类型全名声明目标。
+- `public Type TargetType { get; }` — 被补丁的类型。
+- `public string? TargetMethodName { get; }` — 目标成员名；构造函数类目标为 null。
+- `public MethodType MethodType { get; }` — 目标成员种类。
+- `public Type[] ParameterTypes { get; }` — 目标方法参数类型。
+
+
+### `Astra.Audio`
+
+#### `AudioApi`
+
+`public static class AudioApi`
+
+源码：`src/Astra.Framework/Audio/AudioApi.cs`
+
+> 音频播放对外静态 API，基于 SecretLabNAudio。
+
+- `public static byte PlayAudio(Player player, string file, float volume = 1f)` — 向指定玩家播放音频。
+- `public static byte PlayAudio(string file, float volume = 1f)` — 向所有玩家全局播放音频。
+- `public static void Stop(Player player)` — 停止指定玩家正在播放的音频。
+- `public static void Stop(byte id)` — 按 Id 停止全局音频。
+- `public static void Stop(AudioPlayer player)` — 停止并归还指定的音频播放器到对象池。
+- `public static void Stop()` — 停止所有全局音频。
+
+
+### `Astra.Cancellation`
+
+#### `CancellationTokenApi`
+
+`public static class CancellationTokenApi`
+
+源码：`src/Astra.Framework/Cancellation/CancellationTokenApi.cs`
+
+> 取消令牌对外静态 API，内部委托给 TokenManager。
+
+- `public static CancellationToken GetPlayersToken(Player player)` — 获取与指定玩家绑定的取消令牌，玩家离开时自动取消。
+- `public static CancellationToken GetRoundRestartToken()` — 获取回合重启时取消的令牌。
+- `public static CancellationToken GetFrameworkDisableToken()` — 获取框架禁用时取消的令牌。
+
+
+### `Astra.Countdown`
+
+#### `CountdownApi`
+
+`public static class CountdownApi`
+
+源码：`src/Astra.Framework/Countdown/CountdownApi.cs`
+
+> 倒计时系统对外静态 API，内部委托给 CountdownManager 单例。
+
+- `public static int Start(float delay, Action action, Action tickAction = null, Func<bool> repeat = null)` — 启动一个倒计时。
+- `public static void Cancel(int uuid)` — 取消一个尚未到期的倒计时；已到期或被取消的标识调用无副作用。 供需要在效果中途提前收口的调用方使用（如锚点 / 迷雾区被提前销毁）。
+
+#### `CountdownManager`
+
+`public class CountdownManager : MonoSingleton<CountdownManager>`
+
+源码：`src/Astra.Framework/Countdown/CountdownManager.cs`
+
+> 计时器管理单例。 内部使用二叉最小堆（按触发时间排序）实现优先级队列， 使 AddTimer 为 O(log n)、Update 处理到期计时器为 O(k log n)， 移除计时器通过惰性删除（Cancelled 标记）降为 O(1)。 TickAction 的生命周期**独立于「到期」**：计时器在堆中等待触发期间， 由 ProcessTicks 每 TickInterval 秒回调一次； 到期时执行 Action，再按 Repeat 决定是否重新入队。 因此计时器必须同时登记在最小堆（排序）与活动表（逐帧 tick）中。
+
+- `public const float TickInterval = 1f`
+- `public void Init()` — 初始化
+- `public int AddTimer(float delay, Action action, Action tickAction = null, Func<bool> repeat = null)` — 添加计时器
+- `public void RemoveTimer(int uuid)` — 移除计时器（惰性删除，O(1)）
+- `public void ClearTimer()` — 清除计时器
+
+
+### `Astra.Effects`
+
+#### `CustomEffect`
+
+`public abstract class CustomEffect`
+
+源码：`src/Astra.Framework/Effects/CustomEffect.cs`
+
+- `public CustomEffect(Player player)`
+- `public Player Owner { get; }`
+- `public byte Intensity { get; private set; }`
+- `public float Duration { get; private set; }`
+- `public float TimeLeft { get; private set; }`
+- `public virtual byte MaxIntensity { get; }`
+- `public virtual bool AllowEnabling { get; }`
+- `public bool IsEnabled { get; }`
+- `public void SetState(byte intensity, float duration = 0f, bool addDuration = false)`
+- `public void ForceIntensity(byte value)`
+- `public void ChangeDuration(float duration, bool addDuration)`
+- `public void Update()`
+- `public void DisableEffect()`
+- `public virtual void OnInitialize()`
+- `public virtual void OnDestroy()`
+- `public virtual void Enabled()`
+- `public virtual void Disabled()`
+- `public virtual void OnEffectUpdate()`
+- `public virtual void IntensityChanged(byte oldIntensity, byte newIntensity)`
+- `public virtual void OnOwnerDeath()`
+- `public virtual void OnOwnerRoleChanged()`
+
+#### `CustomEffectApi`
+
+`public static class CustomEffectApi`
+
+源码：`src/Astra.Framework/Effects/CustomEffectApi.cs`
+
+> 自定义效果对外 API：效果施加/移除与控制器访问。
+
+- `public static void Apply(Player player, IReadOnlyList<EffectEntry>? effects)` — 施加一组效果条目。
+- `public static void Remove(Player player, IReadOnlyList<EffectEntry>? effects)` — 移除一组效果条目。
+- `public static bool TryGetController(Player player, out CustomEffectController controller)` — 取玩家的自定义效果控制器。
+- `public static T? GetOrAddEffect<T>(Player player, Func<Player, T> factory) where T : CustomEffect` — 取或添加一个自定义效果实例。
+- `public static void Disable(Player player, Type effectType)` — 禁用一个自定义效果。
+- `public static bool IsAvailable(EffectType effect)` — 查询原版效果是否可用（版本兼容）。
+
+#### `CustomEffectController`
+
+`public class CustomEffectController : MonoBehaviour`
+
+源码：`src/Astra.Framework/Effects/CustomEffectController.cs`
+
+> 承载玩家级"纯托管"自定义效果（CustomEffect 家族）的组件。 效果不进入 PlayerEffectsController.AllEffects，因此不改变原版按索引对齐的强度同步契约。
+
+- `public Player? Owner { get; private set; }` — 效果宿主玩家；未 Bind 前为 null。
+- `public void Bind(Player player)` — 绑定宿主玩家并重建默认效果集合。由 ComponentApplyPatch 在 ReferenceHub.Awake 之后调用。
+- `public void AddEffect(CustomEffect effect)` — 向控制器追加一个效果实例（已存在则忽略）。
+- `public T AddEffect<T>(T effect) where T : CustomEffect` — 追加效果实例并返回它，便于链式使用。
+- `public CustomEffect? GetEffect(Type effectType)` — 按类型取得效果实例（供统一包装类使用）。
+- `public void DisableEffect(Type effectType)` — 按类型停用效果实例，实例保留以便复用。
+- `public T? GetOrAddEffect<T>(Func<Player, T> factory) where T : CustomEffect` — 取得指定类型的效果实例，不存在时用工厂创建并挂载。
+- `public T? GetEffect<T>() where T : CustomEffect` — 取得指定类型的首个效果实例。
+- `public bool TryGetEffect<T>(out T? effect) where T : CustomEffect` — 尝试取得指定类型的首个效果实例。
+- `public T? ChangeState<T>(byte intensity, float duration = 0f, bool addDuration = false) where T : CustomEffect` — 修改指定类型效果的强度与时长。
+- `public void DisableAllEffects()` — 关闭全部效果（含视觉载体清理）。
+- `public void Cleanup()` — 释放全部效果并解除事件订阅（可重复调用）。
+
+#### `CustomEffectHandler`
+
+`public class CustomEffectHandler : CustomEventsHandler`
+
+特性：`[ManagedEvent("Astra - CustomEffectHandler")]`
+
+源码：`src/Astra.Framework/Effects/CustomEffectHandler.cs`
+
+> 玩家离开时清理其身上的自定义效果，避免宿主对象销毁后效果实例残留。
+
+- `public override void OnPlayerLeft(PlayerLeftEventArgs ev)`
+
+#### `Effect`
+
+`public readonly struct Effect : IEquatable<Effect>`
+
+源码：`src/Astra.Framework/Effects/Effect.cs`
+
+> 玩家身上一个状态效果的轻量视图。
+
+- `public Effect(StatusEffectBase effect)` — 包装一个游戏效果实例。
+- `public StatusEffectBase Base { get; }` — 底层游戏对象。
+- `public EffectType Type { get; }` — 对应的效果枚举；未登记时为 None。
+- `public float Duration { get; set; }` — 剩余持续时间（秒）。
+- `public byte Intensity { get; set; }` — 强度。
+- `public bool IsEnabled { get; set; }` — 是否处于启用状态。
+- `public bool Equals(Effect other)`
+- `public override bool Equals(object? obj)`
+- `public override int GetHashCode()`
+
+#### `EffectEntry`
+
+`public readonly struct EffectEntry`
+
+源码：`src/Astra.Framework/Effects/EffectEntry.cs`
+
+> 统一的「效果条目」：原版状态效果与自定义效果共用同一种声明方式。
+
+- `public bool IsCustom { get; }` — 是否为自定义效果。
+- `public EffectType VanillaType { get; }` — 原版效果枚举；自定义效果时为 None。
+- `public Type? CustomType { get; }` — 自定义效果类型；原版效果时为 null。
+- `public byte Intensity { get; }` — 强度。
+- `public float Duration { get; }` — 持续时间（秒），0 表示沿用效果默认值。
+- `public bool AddDuration { get; }` — 是否在剩余时长上累加。
+- `public static EffectEntry Vanilla(EffectType type, byte intensity = 1, float duration = 0f, bool addDuration = false)` — 声明一个原版状态效果。
+- `public static EffectEntry Custom<T>(byte intensity = 1, float duration = 0f, bool addDuration = false) where T : CustomEffect` — 声明一个自定义效果；要求目标类型具备 (Player) 公开构造函数。
+- `public static EffectEntry Custom<T>(Func<Player, T> factory, byte intensity = 1, float duration = 0f, bool addDuration = false) where T : CustomEffect` — 用显式工厂声明一个自定义效果，适合构造函数带额外参数的场景。
+- `public void Apply(Player player)` — 对指定玩家施加该效果。
+- `public void Remove(Player player)` — 从指定玩家身上解除该效果。
+- `public override string ToString()`
+
+#### `IEffects`
+
+`public interface IEffects`
+
+源码：`src/Astra.Framework/Effects/IEffects.cs`
+
+- `EffectEntry[] Effects { get; }`
+
+
+### `Astra.Enums`
+
+#### `AbilityFailReason`
+
+`public enum AbilityFailReason`
+
+源码：`src/Astra.Framework/Enums/AbilityFailReason.cs`
+
+> 能力触发失败的原因。
+
+- `None` — 无失败。
+- `ConditionFail` — 玩家条件不满足。
+- `NotReady` — 冷却未结束。
+
+#### `CancellationTokenCategory`
+
+`public enum CancellationTokenCategory`
+
+源码：`src/Astra.Framework/Enums/CancellationTokenCategory.cs`
+
+> 取消令牌（CancellationToken）的类别。
+
+- `FrameworkDisabled` — 框架禁用时取消。
+- `RoundRestarted` — 回合重启时取消。
+
+#### `EffectClassification`
+
+`public enum EffectClassification`
+
+源码：`src/Astra.Framework/Enums/EffectClassification.cs`
+
+- `Technical`
+- `Negative`
+- `Mixed`
+- `Positive`
+
+#### `EffectType`
+
+`public enum EffectType`
+
+源码：`src/Astra.Framework/Enums/EffectType.cs`
+
+> 玩家状态效果的类型标识。
+
+- `None` — 无效果。
+- `AmnesiaItems`
+- `AmnesiaVision`
+- `Asphyxiated`
+- `Bleeding`
+- `Blinded`
+- `Burned`
+- `Concussed`
+- `Corroding`
+- `Deafened`
+- `Decontaminating`
+- `Disabled`
+- `Ensnared`
+- `Exhausted`
+- `Flashed`
+- `Hemorrhage`
+- `Invigorated`
+- `BodyshotReduction`
+- `Poisoned`
+- `Scp207`
+- `Invisible`
+- `SinkHole`
+- `DamageReduction`
+- `MovementBoost`
+- `RainbowTaste`
+- `SeveredHands`
+- `Stained`
+- `Vitality`
+- `Hypothermia`
+- `Scp1853`
+- `CardiacArrest`
+- `InsufficientLighting`
+- `SoundtrackMute`
+- `SpawnProtected`
+- `Traumatized`
+- `AntiScp207`
+- `Scanned`
+- `PocketCorroding`
+- `SilentWalk`
+- `Marshmallow`
+- `Strangled`
+- `Ghostly`
+- `FogControl`
+- `Slowness`
+- `Scp1344`
+- `SeveredEyes`
+- `PitDeath`
+- `Blurred`
+- `BecomingFlamingo`
+- `Scp559`
+- `Scp956Target`
+- `Snowed`
+- `Scp1344Detected`
+- `Lightweight`
+- `HeavyFooted`
+- `Fade`
+- `NightVision`
+- `Scp1509Resurrected`
+- `TraumatizedEvil`
+- `SlowMetabolism`
+- `TemporaryBypass`
+- `Spicy`
+- `SugarCrave`
+- `OrangeWitness`
+- `Metal`
+- `SugarHigh`
+- `SugarRush`
+- `OrangeCandy`
+- `WhiteCandy`
+- `Prismatic`
+- `AnomalousTarget`
+- `FocusedVision`
+- `AnomalousRegeneration`
+
+#### `HintPosition`
+
+`public enum HintPosition : byte`
+
+源码：`src/Astra.Framework/Enums/HintPosition.cs`
+
+> 提示（Hint）在屏幕上的显示位置。
+
+- `Center` — 屏幕中央。
+- `Left` — 屏幕左侧。
+- `Right` — 屏幕右侧。
+- `CenterTop` — 中上部。
+- `CenterTopLeft` — 中上偏左。
+- `CenterTopRight` — 中上偏右。
+- `CenterBottom` — 中下部。
+- `CenterBottomLeft` — 中下偏左。
+- `CenterBottomRight` — 中下偏右。
+- `Top` — 顶部。
+- `TopLeft` — 顶部偏左。
+- `TopRight` — 顶部偏右。
+- `Bottom` — 底部。
+- `BottomLeft` — 底部偏左。
+- `BottomRight` — 底部偏右。
+- `Custom` — 自定义位置（需自行处理坐标）。
+
+#### `KeybindType`
+
+`public enum KeybindType`
+
+源码：`src/Astra.Framework/Enums/KeybindType.cs`
+
+> 按键能力的触发类型。
+
+- `Press` — 按下时触发。
+- `Hold` — 按住式（松开时触发）。
+
+
+### `Astra.Events`
+
+#### `EnhancedEventsHandler`
+
+`public abstract class EnhancedEventsHandler : CustomEventsHandler`
+
+源码：`src/Astra.Framework/Events/EnhancedEventsHandler.cs`
+
+> 增强事件管理器：继承 CustomEventsHandler 并额外提供框架扩展的射击事件虚方法。 继承该类并重写相应方法即可自动接收射击事件。
+
+- `public EnhancedEventsHandler()`
+- `public virtual void OnExiledShooting(ShootingEventArgs ev)` — 玩家开火前触发。
+- `public virtual void OnExiledShot(ShotEventArgs ev)` — 子弹命中后触发。
+
+#### `EventApi`
+
+`public static class EventApi`
+
+源码：`src/Astra.Framework/Events/EventApi.cs`
+
+> 事件处理器对外 API：状态查询与启停。
+
+- `public static IReadOnlyList<EventHandlerStatus> Handlers { get; }` — 全部已登记事件处理器的状态快照。
+- `public static bool TryGetStatus(string id, out EventHandlerStatus status)` — 按 Id 查询处理器状态。
+- `public static bool Enable(string id)` — 启用处理器。
+- `public static bool Disable(string id)` — 禁用处理器。
+
+#### `EventHandlerStatus`
+
+`public sealed class EventHandlerStatus`
+
+源码：`src/Astra.Framework/Events/EventManager.cs`
+
+- `public string Id { get; }`
+- `public Type HandlerType { get; }`
+- `public string TypeFullName { get; }`
+- `public bool IsEnabled { get; }`
+
+#### `EventMethodManager`
+
+`public static class EventMethodManager`
+
+源码：`src/Astra.Framework/Events/EventMethodManager.cs`
+
+> 事件方法管理器：负责将带 EventMethodAttribute 的方法订阅到对应 .NET 事件， 并在框架禁用时统一取消订阅。
+
+- `public static void Register(object? instance)`
+- `public static void Register(MethodInfo methodInfo, object? instance = null)` — 将指定方法订阅到其 EventMethodAttribute 声明的所有事件。
+- `public static void Unregister(MethodInfo methodInfo, [CanBeNull] EventInfo eventInfo = null)` — 取消订阅指定方法（可选按事件过滤）。
+- `public static void UnregisterAll()` — 取消订阅所有已登记的事件方法。
+
+#### `PlayerEvents`
+
+`public static class PlayerEvents`
+
+源码：`src/Astra.Framework/Events/PlayerEvents.cs`
+
+> 框架扩展的玩家事件集合（射击相关）。 事件由 IL 织入的补丁触发，用法与 LabAPI 静态事件一致。
+
+- `public static event LabEventHandler<ShootingEventArgs> Shooting`
+- `public static event LabEventHandler<ShotEventArgs> Shot`
+- `public static void OnShooting(ShootingEventArgs ev)` — 触发 Shooting 事件（框架内部调用）。
+- `public static void OnShot(ShotEventArgs ev)` — 触发 Shot 事件（框架内部调用）。
+
+#### `ShootingEventArgs`
+
+`public class ShootingEventArgs : System.EventArgs, IPlayerEvent, IFirearmItemEvent, IItemEvent, ICancellableEvent`
+
+源码：`src/Astra.Framework/Events/EventArgs/ShootingEventArgs.cs`
+
+> Contains all information before a player fires a weapon. ClaimedTarget and Player transform values are modified by FpcBacktracker according to ShotBacktrackData sent by the Player and do not match the actual values.
+
+- `public ShootingEventArgs(BaseFirearm firearm, ref ShotBacktrackData shotBacktrackData)` — Initializes a new instance of the ShootingEventArgs class.
+- `public Player Player { get; }` — Gets the player who is shooting.
+- `public Player ClaimedTarget { get; }` — Gets the target that client claims it hit.
+- `public ShotBacktrackData ShotBacktrackData { get; }` — Gets the ShotBacktrackData. This object contains the data sent by the client to the server.
+- `public Vector3 Direction { get; set; }` — Gets or sets the exact direction of the shot before the bullet spread is applied.
+- `public FirearmItem FirearmItem { get; }` — Gets the firearm that is being fired.
+- `public Item Item { get; }`
+- `public bool IsAllowed { get; set; }` — Gets or sets a value indicating whether the shot can be fired.
+
+#### `ShotEventArgs`
+
+`public class ShotEventArgs : System.EventArgs, IPlayerEvent, IFirearmItemEvent, IItemEvent`
+
+源码：`src/Astra.Framework/Events/EventArgs/ShotEventArgs.cs`
+
+> Contains all information after a player has fired a weapon.
+
+- `public ShotEventArgs(HitscanHitregModuleBase hitregModule, RaycastHit hitInfo, Firearm firearm, IDestructible destructible, float damage)` — Initializes a new instance of the ShotEventArgs class.
+- `public Player Player { get; }` — Gets the player who fired the shot.
+- `public FirearmItem FirearmItem { get; }` — Gets the firearm used to fire the shot.
+- `public Item Item { get; }`
+- `public HitscanHitregModuleBase HitregModule { get; }` — Gets the firearm hitreg module responsible for the shot.
+- `public RaycastHit RaycastHit { get; }` — Gets the raycast info.
+- `public float Distance { get; }` — Gets the bullet travel distance.
+- `public Vector3 Position { get; }` — Gets the position of the hit.
+- `public float Damage { get; }` — Gets the firearm base damage at the hit distance. Actual inflicted damage may vary.
+- `public Player Target { get; }` — Gets the target player. Can be null.
+- `public HitboxIdentity Hitbox { get; }` — Gets the HitboxIdentity component of the target player that was hit. Can be null.
+- `public IDestructible Destructible { get; }` — Gets the IDestructible component of the hit collider. Can be null.
+- `public bool CanHurt { get; set; }` — Gets or sets a value indicating whether the shot can deal damage.
+- `public bool CanSpawnImpactEffects { get; set; }` — Gets or sets a value indicating whether the shot can produce impact effects (e.g. bullet holes).
+
+
+### `Astra.Extensions`
+
+#### `MapExtensions`
+
+`public static class MapExtensions`
+
+源码：`src/Astra.Framework/Extensions/MapExtensions.cs`
+
+> 地图环境音相关的扩展方法。
+
+- `public static AmbientSoundPlayer AmbientSoundPlayer { get; }` — 获取主机（Host）的 AmbientSoundPlayer 组件。
+- `public static void PlayAmbientSound()` — Plays a random ambient sound.
+- `public static void PlayAmbientSound(int id)` — Plays an ambient sound.
+
+#### `PlayerEffectExtensions`
+
+`public static class PlayerEffectExtensions`
+
+源码：`src/Astra.Framework/Extensions/PlayerEffectExtensions.cs`
+
+> 以 EffectType 为入口的玩家状态效果操作。
+
+- `public static StatusEffectBase? FindEffect(this Player player, EffectType effect)` — 在玩家身上定位指定效果实例。
+- `public static void EnableEffect(this Player player, EffectType effect, byte intensity = 1, float duration = 0f, bool addDuration = false)` — 启用（或刷新）一个效果。
+- `public static void DisableEffect(this Player player, EffectType effect)` — 关闭一个效果。
+- `public static bool TryGetEffect(this Player player, EffectType effect, out StatusEffectBase? instance)` — 尝试取得玩家的指定效果实例。
+- `public static Effect? GetEffect(this Player player, EffectType effect)` — 取得玩家的指定效果视图。
+- `public static IReadOnlyList<Effect> GetEffects(this Player player)` — 取得玩家当前所有生效中的效果视图。
+- `public static byte GetEffectIntensity(this Player player, EffectType effect)` — 读取效果强度。
+- `public static void ChangeEffectIntensity(this Player player, EffectType effect, byte intensity, float duration = 0f)` — 修改效果强度；duration 大于 0 时同时续期。
+
+#### `PlayerExtensions`
+
+`public static class PlayerExtensions`
+
+源码：`src/Astra.Framework/Extensions/PlayerExtensions.cs`
+
+> 针对 Player 的技能相关扩展方法。
+
+- `public static bool TryGetAbilityManager(this Player player, out CustomAbilityManager manager)` — 获取玩家的技能管理器。
+- `public static bool TryGetPlayerAbility<T>(this Player player, out T ability) where T : CustomAbility, new()` — 按泛型类型获取玩家的技能实例。
+- `public static bool TryGetPlayerAbility(this Player player, string id, out CustomAbility ability)` — 按 Id 获取玩家的技能实例。
+- `public static bool TryGetPlayerAbility(this Player player, int settingId, out CustomAbility ability)` — 按 SettingId 获取玩家的技能实例。
+
+
+### `Astra.Hints`
+
+#### `HintApi`
+
+`public static class HintApi`
+
+源码：`src/Astra.Framework/Hints/HintApi.cs`
+
+> 对外暴露的静态提示 API，内部委托给 HintManager 单例。
+
+- `public static void SendTo(Player player, string message, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null)` — 向指定玩家发送普通静态提示。
+- `public static void SendDynamic(Player player, string message, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null)` — 向指定玩家发送动态提示。
+- `public static void SendDynamic(Player player, Func<string> textGenerator, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null)` — 向指定玩家发送动态提示。
+- `public static void SendDynamic(Player player, Func<AutoContentUpdateArg, string> textGenerator, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null)` — 向指定玩家发送动态提示。
+- `public static void SendTo(Player player, Func<string> textGenerator, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null, HintSyncSpeed syncSpeed = HintSyncSpeed.Normal)` — 向指定玩家发送自动文本提示（支持动态更新文本）。
+- `public static void SendTo(Player player, Func<AutoContentUpdateArg, string> textGenerator, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null, HintSyncSpeed syncSpeed = HintSyncSpeed.Normal)` — 向指定玩家发送自动文本提示（支持动态更新文本）。
+- `public static void SendAbstractHint(Player player, AbstractHint hint, float duration)` — 向指定玩家直接发送Hint类。
+- `public static void RemoveHint(Player player, string messageId)` — 移除指定玩家身上、由本框架发送的、带指定标识的提示。
+
+#### `HintManager`
+
+`public static class HintManager`
+
+源码：`src/Astra.Framework/Hints/HintManager.cs`
+
+> 统一管理游戏中各种提示（Hint）的发送与生命周期。
+
+- `public static void SendTo(Player player, string message, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null)` — 发送普通静态提示。
+- `public static void SendDynamic(Player player, string message, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, [CanBeNull] string messageId = null)` — 发送动态提示（DynamicHint）。
+- `public static void SendDynamic(Player player, Func<string> textGenerator, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, [CanBeNull] string messageId = null)` — 发送动态提示（DynamicHint）。
+- `public static void SendDynamic(Player player, Func<AutoContentUpdateArg, string> textGenerator, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, [CanBeNull] string messageId = null)` — 发送动态提示（DynamicHint）。
+- `public static void SendTo(Player player, Func<string> textGenerator, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null, HintSyncSpeed syncSpeed = HintSyncSpeed.Normal)` — 发送自动文本提示（AutoText），可根据委托动态更新文本。
+- `public static void SendTo(Player player, Func<AutoContentUpdateArg, string> textGenerator, float duration = 3f, HintPosition position = HintPosition.CenterTop, int fontSize = 20, string messageId = null, HintSyncSpeed syncSpeed = HintSyncSpeed.Normal)` — 发送自动文本提示（AutoText），可根据委托动态更新文本。
+- `public static void SendAbstractHint(Player player, AbstractHint hint, float duration)` — 核心发送逻辑：移除重复提示，添加新提示，并在 duration 后自动移除。
+- `public static void RemoveHint(Player player, string messageId)` — 移除指定玩家身上由本程序集发送的、带指定标识的提示。
+
+#### `HintPositionMapping`
+
+`public static class HintPositionMapping`
+
+源码：`src/Astra.Framework/Hints/HintPositionMapping.cs`
+
+> 将 HintPosition 映射为 HintServiceMeow 的对齐方式与坐标。
+
+- `public static (HintAlignment alignment, float y) GetForHint(HintPosition position)` — 获取静态提示的对齐方式与 Y 坐标；未知位置回退为居中（Center, 650）。
+- `public static (float x, float y) GetForDynamicHint(HintPosition position, float originXPos, float textWidth)` — 获取动态提示的 X/Y 坐标（根据对齐方式与文本宽度计算 X）。
+
+
+### `Astra.HumeShield`
+
+#### `CustomHumeShieldApi`
+
+`public static class CustomHumeShieldApi`
+
+源码：`src/Astra.Framework/HumeShield/CustomHumeShieldApi.cs`
+
+> 自定义护盾对外 API：护盾驱动器的挂载与移除。
+
+- `public static void Apply(Player player, ICustomHumeShieldStat stat)` — 给玩家挂载自定义护盾驱动器。
+- `public static void Remove(Player player)` — 移除玩家的自定义护盾驱动器（护盾清零并解除覆盖锁）。
+
+#### `CustomHumeShieldEventHandler`
+
+`public class CustomHumeShieldEventHandler : CustomEventsHandler`
+
+特性：`[ManagedEvent("Astra - CustomHumeShieldStat")]`
+
+源码：`src/Astra.Framework/HumeShield/CustomHumeShieldEventHandler.cs`
+
+- `public override void OnPlayerChangingRole(PlayerChangingRoleEventArgs ev)`
+
+#### `ICustomHumeShieldBlocker`
+
+`public interface ICustomHumeShieldBlocker`
+
+源码：`src/Astra.Framework/HumeShield/ICustomHumeShieldBlocker.cs`
+
+> 可临时阻断休谟护盾恢复的来源（技能、区域、状态）。
+
+- `bool HumeShieldBlocked { get; }` — 当前是否正在阻断恢复。
+
+#### `ICustomHumeShieldStat`
+
+`public interface ICustomHumeShieldStat`
+
+源码：`src/Astra.Framework/HumeShield/ICustomHumeShieldStat.cs`
+
+> 自定义角色的休谟护盾参数。
+
+- `bool IsDestroyed { get; }` — 角色是否已销毁。销毁后护盾立即收口。
+- `float MaxHumeShield { get; }` — 护盾上限。仅在 HumeShieldCurve 为 null 时生效。
+- `AnimationCurve HumeShieldCurve { get; }` — 上限随血量比例的曲线，复刻原版 ShieldOverHealth。
+- `float HumeShieldRegenRate { get; }` — 每秒恢复量。
+- `float HumeShieldRegenDelay { get; }` — 受伤后延迟多少秒才开始恢复。
+
+
+### `Astra.Items`
+
+#### `CustomFirearm`
+
+`public abstract class CustomFirearm : CustomItem`
+
+源码：`src/Astra.Framework/Items/CustomFirearm.cs`
+
+> 自定义枪械：在 CustomItem 之上补充射击数值与开火行为。
+
+- `protected CustomFirearm(ItemType baseItem)` — 构造：指定承载的原版枪械类型。
+- `public override ItemType BaseItem { get; }`
+- `public virtual float Damage { get; }` — 单发伤害。
+- `public virtual float FireRate { get; }` — 射速（发/分钟）。
+- `public virtual int MagazineSize { get; }` — 弹匣容量；-1 表示沿用原版。
+- `public virtual float ReloadTime { get; }` — 换弹时间（秒）；-1 表示沿用原版。
+- `public virtual int Penetration { get; }` — 穿透力（可穿透的目标数）。
+- `public virtual float Spread { get; }` — 扩散角（度）。
+- `public float FireInterval { get; }` — 射击间隔（秒），由 FireRate 推导。
+
+#### `CustomItem`
+
+`public abstract class CustomItem : IIdentifiable`
+
+源码：`src/Astra.Framework/Items/CustomItem.cs`
+
+> 自定义物品基类：以一个原版 ItemType 为承载体，附加自定义行为与数值。
+
+- `public abstract string Id { get; }`
+- `public abstract string Name { get; }`
+- `public abstract ItemType BaseItem { get; }` — 承载本自定义物品的原版物品类型。
+- `public virtual string Description { get; }` — 物品描述，默认空。
+- `public virtual float Weight { get; }` — 物品重量；-1 表示使用原版默认值。
+- `public virtual bool OnShooting(ShootingEventArgs ev)` — 射击事件（仅对枪械类物品有意义）：返回 false 阻止原版射击。
+- `public virtual void OnAcquired(Player player, Item item)` — 物品被玩家获得时调用。
+- `public virtual void OnDropped(Player player, Pickup pickup)` — 物品被丢弃时调用。
+- `public virtual Item? Give(Player player)` — 给玩家发放本物品。
+
+#### `CustomItemApi`
+
+`public static class CustomItemApi`
+
+源码：`src/Astra.Framework/Items/CustomItemApi.cs`
+
+> 自定义物品对外 API：定义查询、发放与实例溯源。
+
+- `public static IReadOnlyDictionary<string, CustomItem> Items { get; }` — 当前已实例化的自定义物品定义。
+- `public static CustomItem? Find(string id)` — 按 Id 查找自定义物品定义。
+- `public static T? Find<T>() where T : CustomItem` — 按类型查找自定义物品定义。
+- `public static CustomItem? FindByItemType(ItemType itemType)` — 按原版物品类型查找自定义定义。
+- `public static CustomItem? FindByItem(Item? item)` — 按物品实例查找其自定义定义。
+- `public static Item? Give(Player player, string id)` — 按 Id 给玩家发放自定义物品。
+- `public static Item? Give<T>(Player player) where T : CustomItem` — 按类型给玩家发放自定义物品。
+- `public static void RegisterTemplate(Type type)` — 登记物品模板（框架自动扫描时调用，通常无需手动）。
+- `public static void Initialize()` — 按模板实例化全部自定义物品（幂等，框架启动时自动调用）。
+
+#### `CustomItemEventHandler`
+
+`public class CustomItemEventHandler : EnhancedEventsHandler`
+
+特性：`[ManagedEvent("Astra - CustomItem")]`
+
+源码：`src/Astra.Framework/Items/CustomItemEventHandler.cs`
+
+> 自定义物品的事件转发：把玩家行为交给对应的 CustomItem 决定是否拦截。
+
+- `public override void OnExiledShooting(ShootingEventArgs ev)` — 射击：玩家手持自定义物品且其 OnShooting 返回 false 时阻止原版开火。
+
+#### `CustomJailbird`
+
+`public abstract class CustomJailbird : CustomItem`
+
+源码：`src/Astra.Framework/Items/CustomJailbird.cs`
+
+> 自定义 Jailbird：在 CustomItem 之上补充充能/放电参数。
+
+- `protected CustomJailbird(ItemType baseItem)` — 构造：指定承载的原版物品类型。
+- `public override ItemType BaseItem { get; }`
+- `public virtual float Damage { get; }` — 单次攻击伤害。
+- `public virtual float ChargeCost { get; }` — 每次使用消耗的电量百分比。
+- `public virtual float RechargeRate { get; }` — 每秒回充百分比。
+
+#### `CustomMicroHid`
+
+`public abstract class CustomMicroHid : CustomItem`
+
+源码：`src/Astra.Framework/Items/CustomMicroHid.cs`
+
+> 自定义 Micro-HID：在 CustomItem 之上补充蓄能/放电参数。
+
+- `protected CustomMicroHid(ItemType baseItem)` — 构造：指定承载的原版物品类型。
+- `public override ItemType BaseItem { get; }`
+- `public virtual float Damage { get; }` — 单次放电伤害。
+- `public virtual float Range { get; }` — 有效射程（米）。
+- `public virtual float ChargeRate { get; }` — 每秒蓄能百分比。
+- `public float ChargeSeconds { get; }` — 蓄满所需秒数。
+
+#### `CustomParticleDisruptor`
+
+`public abstract class CustomParticleDisruptor : CustomItem`
+
+源码：`src/Astra.Framework/Items/CustomParticleDisruptor.cs`
+
+> 自定义 Particle Disruptor（轨道炮类）：蓄力、穿透与射线伤害。
+
+- `protected CustomParticleDisruptor(ItemType baseItem)` — 构造：指定承载的原版物品类型。
+- `public override ItemType BaseItem { get; }`
+- `public virtual float ChargeTime { get; }` — 蓄力时间（秒）。
+- `public virtual float Damage { get; }` — 单目标伤害。
+- `public virtual float Range { get; }` — 射程（米）。
+- `public virtual int PierceCount { get; }` — 可穿透的目标数量；0 表示命中即止。
+- `public virtual float DamageFalloff { get; }` — 穿透时每层的伤害衰减系数（0~1）。
+- `public virtual Color BeamColor { get; }` — 光束颜色（供客户端/后续表现层使用）。
+- `public override bool OnShooting(ShootingEventArgs ev)` — 射击事件：阻止原版开火并立即结算自定义射线。
+- `public virtual IReadOnlyList<Player> Fire(Player player)` — 结算一次穿透射线：从玩家视角沿朝向发射，按 PierceCount 穿透并逐层衰减。
+- `public virtual void OnFired(Player player, IReadOnlyList<Player> hits)` — 射线结算完成后的回调。
+
+
+### `Astra.Loader`
+
+#### `ICallOnRegister`
+
+`public interface ICallOnRegister`
+
+源码：`src/Astra.Framework/Loader/ICallOnRegister.cs`
+
+> 表示组件在被注册为事件处理器时需要执行一次初始化回调。
+
+- `void OnRegisterEvents()` — 在组件被注册到事件系统时调用。
+
+#### `ICallOnUnregister`
+
+`public interface ICallOnUnregister`
+
+源码：`src/Astra.Framework/Loader/ICallOnUnregister.cs`
+
+> 表示组件在被注销事件处理器时需要执行一次清理回调。
+
+- `void OnUnregisterEvents()` — 在组件从事件系统注销时调用。
+
+#### `IdentifiableManager<T>`
+
+`public class IdentifiableManager<T> where T : IIdentifiable`
+
+源码：`src/Astra.Framework/Loader/IdentifiableManager.cs`
+
+> 基于字符串 Id 的组件管理器，提供 IIdentifiable 组件的增删查。
+
+- `protected readonly Dictionary<string, T> Items`
+- `public void Add(T item)` — 添加组件，Id 不能为空。
+- `public void Remove(string id)` — 按 Id 移除组件。
+- `public T Get(string id)` — 按 Id 获取组件，不存在时返回默认值。
+- `public IEnumerable<T> GetAll()` — 获取所有组件的快照。
+- `public bool Contains(string id)` — 判断是否存在指定 Id 的组件。
+
+#### `MonoSingleton<T>`
+
+`public abstract class MonoSingleton<T> : MonoBehaviour where T : MonoSingleton<T>`
+
+源码：`src/Astra.Framework/Loader/MonoSingleton.cs`
+
+> Unity 懒加载单例基类：首次访问 Instance 时自动创建 GameObject 并 DontDestroyOnLoad， 保证场景切换时单例不被销毁。
+
+- `protected GameObject GameObject { get; private set; }` — 宿主 GameObject。
+- `public static T Instance { get; }` — 获取单例实例，不存在时自动创建。
+- `protected virtual void Awake()` — Unity Awake：确保单例唯一，重复创建的实例会被销毁。
+- `protected virtual void OnDestroy()` — Unity OnDestroy：单例销毁时清空静态引用。
+
+
+### `Astra.Patching`
+
+#### `IManualPatch`
+
+`public interface IManualPatch`
+
+源码：`src/Astra.Framework/Patching/IManualPatch.cs`
+
+> 表示一个手动应用 Harmony 补丁的组件。 与声明式 [HarmonyPatch] 不同，实现该接口可在代码中自行决定如何打补丁。
+
+- `void ApplyPatch(Harmony harmony)` — 应用补丁。
+
+#### `PatchApi`
+
+`public static class PatchApi`
+
+源码：`src/Astra.Framework/Patching/PatchApi.cs`
+
+> 托管补丁对外 API：状态查询与启停。
+
+- `public static IReadOnlyList<PatchStatus> Patches { get; }` — 全部已登记补丁的状态快照。
+- `public static bool TryGetStatus(string id, out PatchStatus status)` — 按 Id 查询补丁状态。
+- `public static bool Enable(string id)` — 启用补丁。
+- `public static bool Disable(string id)` — 禁用补丁。
+- `public static void DisableAll()` — 卸载全部补丁。
+
+#### `PatchStatus`
+
+`public sealed class PatchStatus`
+
+源码：`src/Astra.Framework/Patching/PatchManager.cs`
+
+- `public string Id { get; }`
+- `public Type PatchType { get; }`
+- `public string TypeFullName { get; }`
+- `public bool IsEnabled { get; }`
+
+
+### `Astra.Roles`
+
+#### `CustomRole`
+
+`public abstract class CustomRole : CustomEventsHandler, ICustomContent, IOriginalRole`
+
+源码：`src/Astra.Framework/Roles/CustomRole.cs`
+
+- `public abstract string Id { get; }`
+- `public abstract string Name { get; }`
+- `public virtual string Description { get; set; }`
+- `public Player? Owner { get; private set; }` — 该实例绑定的玩家。
+- `public virtual RoleTypeId RoleType { get; set; }`
+- `public virtual RoleSpawnFlags SpawnFlags { get; }`
+- `public virtual RoleChangeReason ChangeReason { get; }`
+- `public virtual Vector3 Scale { get; }`
+- `public virtual Vector3 Gravity { get; }`
+- `public virtual bool ShowCustomInfo { get; set; }`
+- `public virtual float MaxHealth { get; set; }`
+- `public virtual ItemType[] Items { get; set; }`
+- `public virtual bool ClearInventory { get; set; }`
+- `public bool IsDestroyed { get; private set; }`
+- `public virtual string RoleColor { get; }` — 角色配色，由 RoleType 推导，只读。
+- `public virtual CustomTeam? CustomTeam { get; }` — 角色所属的自定义阵营；为 null 时沿用原版阵营关系。
+- `public virtual Team Team { get; }` — 角色所属阵营，由 RoleType 推导，只读。
+- `public bool Check(Player player)` — 判断指定玩家当前是否持有本角色（按 Id 比对）。
+- `protected virtual void OnAdded(Player player)`
+- `protected virtual void OnRemoved(Player player)`
+- `public override void OnPlayerChangingRole(PlayerChangingRoleEventArgs ev)` — 角色变更前收口。
+- `public virtual CustomRole CreateInstance()`
+
+#### `CustomRoleApi`
+
+`public static class CustomRoleApi`
+
+源码：`src/Astra.Framework/Roles/CustomRoleApi.cs`
+
+> 自定义角色对外 API：模板查询与玩家角色增删。
+
+- `public static IReadOnlyCollection<CustomRole> RoleTemplates { get; }` — 当前已注册的全部角色模板。
+- `public static bool TryGetRoleTemplate(string id, out CustomRole role)` — 按 Id 获取角色模板。
+- `public static bool TryGetRoleTemplate<T>(out T role) where T : CustomRole, new()` — 按类型获取角色模板。
+- `public static CustomRole? AddRole<T>(Player player) where T : CustomRole, new()` — 按泛型类型给玩家套用角色。
+- `public static CustomRole? AddRole(Player player, string id)` — 按 Id 给玩家套用角色。
+- `public static CustomRole? GetRole(Player player)` — 取玩家当前的自定义角色。
+- `public static bool TryGetRole(Player player, out CustomRole role)` — 尝试取玩家当前的自定义角色。
+- `public static void RemoveRole(Player player)` — 移除玩家当前的自定义角色。
+
+#### `IOriginalRole`
+
+`public interface IOriginalRole`
+
+源码：`src/Astra.Framework/Roles/IOriginalRole.cs`
+
+- `RoleTypeId RoleType { get; }`
+
+#### `StandardRole`
+
+`public abstract class StandardRole : CustomRole, IAbilityRole, ICustomHumeShieldStat, IEffects`
+
+源码：`src/Astra.Framework/Roles/StandardRole.cs`
+
+- `public virtual CustomAbility[] Abilities { get; }`
+- `public virtual float MaxHumeShield { get; set; }` — 护盾上限；HumeShieldCurve 非空时以曲线为准。
+- `public virtual AnimationCurve HumeShieldCurve { get; set; }` — 护盾上限随血量比例的曲线（纵轴为护盾绝对值），复刻原版 ShieldOverHealth。
+- `public virtual float HumeShieldRegenRate { get; set; }` — 每秒恢复量。
+- `public virtual float HumeShieldRegenDelay { get; set; }` — 受伤后延迟多少秒开始恢复。
+- `public virtual EffectEntry[] Effects { get; }` — 套用角色时一并施加的效果集合，原版效果与自定义效果可混用。
+
+
+### `Astra.ServerSpecificSettings`
+
+#### `ServerSpecificSettingBase`
+
+`public abstract class ServerSpecificSettingBase : IIdentifiable`
+
+源码：`src/Astra.Framework/ServerSpecificSettings/ServerSpecificSettingBase.cs`
+
+> 服务器专属设置（ServerSpecificSettings）的抽象基类。 继承该类并按 Id 返回一组设置项，框架会自动统一下发给客户端。
+
+- `public abstract string Id { get; }` — 获取该设置组的全局唯一标识。
+- `public abstract UserSettings.ServerSpecific.ServerSpecificSettingBase[] ActiveSettings { get; }` — 获取该设置组包含的服务器专属设置项。
+- `public virtual int Priority { get; }` — 获取设置组的排序优先级（数值越小越靠前，-1 表示排最后）。
+
+#### `ServerSpecificSettingManager`
+
+`public static class ServerSpecificSettingManager`
+
+源码：`src/Astra.Framework/ServerSpecificSettings/ServerSpecificSettingManager.cs`
+
+> 服务器专属设置管理器单例：负责设置组的登记、注销与统一下发。
+
+- `public static void Register(string id)` — 按 Id 登记设置组。
+- `public static void Unregister(string id)` — 按 Id 注销设置组。
+- `public static void SendToAll()` — 将所有设置组按优先级排序、按 SettingId 去重后统一下发给客户端。
+
+
+### `Astra.Teams`
+
+#### `CustomTeam`
+
+`public abstract class CustomTeam : IEquatable<CustomTeam>, IIdentifiable`
+
+源码：`src/Astra.Framework/Teams/CustomTeam.cs`
+
+> 自定义阵营：声明本阵营与「原版阵营 / 其它自定义阵营」是敌对还是友好。
+
+- `public abstract string Id { get; }` — 阵营唯一标识。
+- `public abstract string Name { get; }` — 阵营显示名。
+- `public virtual Color TeamColor { get; }` — 阵营配色，默认白色。
+- `public virtual CustomTeamRelation Relation { get; }` — 关系模式，默认 Custom。
+- `public virtual bool KeepVanillaRelate { get; }` — 是否保留原版阵营关系（仅 Custom 下生效）。
+- `public virtual Team VanillaTeam { get; }` — 本阵营对应的原版 Team：既是「我方在原版体系中的代表」， 也是名单里引用我方时的匹配键之一。
+- `public virtual Faction VanillaFaction { get; }` — 本阵营对应的原版 Faction：用于派系级别的匹配与比较。
+- `public virtual IReadOnlyList<RelationEntry> Blacklist { get; }` — 敌对名单。
+- `public virtual IReadOnlyList<RelationEntry> Whitelist { get; }` — 友好名单。
+- `public IReadOnlyList<CustomWave> Waves { get; }` — 归属本阵营的自定义波次（由波次侧的 Teams 反向填充）。
+- `public bool IsHostileTowards(CustomTeam? other, Team otherVanillaTeam)` — 判断本阵营是否敌对指定目标。
+- `public bool? TryGetExplicitRelation(CustomTeam? other, Team otherVanillaTeam, RoleTypeId? otherRole = null)` — 取得本阵营对目标的明确态度；未明确声明时返回 null。
+- `protected virtual bool IsVanillaEnemy(Team otherTeam)` — 判断本阵营与原版阵营的关系（仅 KeepVanillaRelate 为 true 时使用）。
+- `protected virtual bool IsCustomEnemy(CustomTeam other)` — 判断两个自定义阵营在「原版关系」下的敌友（仅 KeepVanillaRelate 为 true 时使用）。
+- `public bool Equals(CustomTeam? other)`
+- `public override bool Equals(object? obj)`
+- `public override int GetHashCode()`
+- `public override string ToString()`
+
+#### `CustomTeamApi`
+
+`public static class CustomTeamApi`
+
+源码：`src/Astra.Framework/Teams/CustomTeamApi.cs`
+
+> 自定义阵营对外 API：注册表查询与每回合实例化。
+
+- `public static IReadOnlyDictionary<string, CustomTeam> Teams { get; }` — 当前回合的全部阵营实例。
+- `public static CustomTeam? Find(string id)` — 按 Id 查找当前回合的阵营实例。
+- `public static T? Find<T>() where T : CustomTeam` — 按类型查找阵营实例。
+- `public static bool TryFind<T>(out T team) where T : CustomTeam` — 按类型查找阵营实例。
+- `public static void Initialize()` — 按模板实例化阵营（幂等，框架启动时自动调用；跨回合复用不重建）。
+- `public static void RegisterTemplate(Type type)` — 登记阵营模板（框架自动扫描时调用，通常无需手动）。
+
+#### `CustomTeamRelation`
+
+`public enum CustomTeamRelation`
+
+源码：`src/Astra.Framework/Teams/CustomTeamRelation.cs`
+
+> 自定义阵营与外界的关系模式。
+
+- `Custom = 0` — 自定义关系：由 Blacklist / Whitelist 与 KeepVanillaRelate 共同决定。
+- `AllFriendly` — 与所有其它阵营友好（忽略黑白名单与 KeepVanillaRelate）。
+- `AllHostile` — 与所有其它阵营敌对（忽略黑白名单与 KeepVanillaRelate）。
+
+#### `CustomTeamResolver`
+
+`public static class CustomTeamResolver`
+
+源码：`src/Astra.Framework/Teams/CustomTeamResolver.cs`
+
+> 把玩家映射到自定义阵营，并计算双方敌对关系。
+
+- `public static CustomTeam? GetTeam(ReferenceHub? hub)` — 取得玩家的自定义阵营；没有自定义角色或未声明阵营时为 null。
+- `public static Team GetVanillaTeam(ReferenceHub? hub)` — 取得玩家的原版阵营。
+- `public static bool IsExplicitFriendlyWith(ReferenceHub? hub, Team team)` — 判断玩家所属自定义阵营是否与指定原版阵营明确友好。
+- `public static bool IsExplicitFriendlyWithScp(ReferenceHub? hub, RoleTypeId scpRole)` — 判断玩家所属自定义阵营是否豁免某个 SCP 的特殊技能。
+- `public static bool IsEnemy096HitGate(Team attackerTeam, HitboxIdentity hitbox)` — SCP-096 挥击门禁：原版此处只有 IsEnemy(Team, Team)（拿不到玩家实例）， 由转译器把调用点替换为本方法，用受击者 hub 做完整的自定义阵营判定。
+- `public static bool TryResolveHostility(ReferenceHub? attacker, ReferenceHub? victim, out bool result)` — 计算两名玩家是否敌对。
+
+#### `RelationEntry`
+
+`public readonly struct RelationEntry : IEquatable<RelationEntry>`
+
+源码：`src/Astra.Framework/Teams/RelationEntry.cs`
+
+> 名单条目：把 RoleTypeId / Team / Faction / 自定义阵营 Id 四种键**包成强类型**，杜绝非法字符串静默失配。
+
+- `public RelationEntryKind Kind { get; }` — 条目类别。
+- `public RoleTypeId? Role { get; }` — Role 类别的值；其它类别为 null。
+- `public Team? Team { get; }` — Team 类别的值；其它类别为 null。
+- `public Faction? Faction { get; }` — Faction 类别的值；其它类别为 null。
+- `public string? CustomTeamId { get; }` — 自定义阵营类别的 Id；其它类别为 null。
+- `public static RelationEntry For(RoleTypeId role)` — 创建 Role 条目。
+- `public static RelationEntry For(Team team)` — 创建 Team 条目。
+- `public static RelationEntry For(Faction faction)` — 创建 Faction 条目。
+- `public static RelationEntry For(string customTeamId)` — 创建自定义阵营条目。
+- `public static RelationEntry Parse(string raw)` — 解析字符串为条目（隐式转换的底层实现）。
+- `public bool Equals(RelationEntry other)`
+- `public override bool Equals(object? obj)`
+- `public override int GetHashCode()`
+- `public override string ToString()`
+- `public static implicit operator RelationEntry(string raw)` — 字符串到条目的隐式转换（会校验）。
+- `public static implicit operator RelationEntry(RoleTypeId role)` — RoleTypeId 到条目的隐式转换。
+- `public static implicit operator RelationEntry(Team team)` — Team 到条目的隐式转换。
+- `public static implicit operator RelationEntry(Faction faction)` — Faction 到条目的隐式转换。
+
+#### `RelationEntryKind`
+
+`public enum RelationEntryKind`
+
+源码：`src/Astra.Framework/Teams/RelationEntry.cs`
+
+> 名单条目的类别。
+
+- `Role` — 原版角色（最细粒度，如 Scp049）。
+- `Team` — 原版阵营（如 SCPs）。
+- `Faction` — 原版派系（如 SCP）。
+- `CustomTeam` — 自定义阵营 Id。
+
+
+### `Astra.Waves`
+
+#### `CustomWave`
+
+`public abstract class CustomWave : IIdentifiable`
+
+源码：`src/Astra.Framework/Waves/CustomWave.cs`
+
+> 自定义刷新波次的框架基类：声明「刷新哪些自定义角色、各多少个」以及所属阵营与播报。
+
+- `public abstract string Id { get; }`
+- `public abstract string Name { get; }`
+- `public IReadOnlyDictionary<string, int> Table { get; }` — 刷新配置：自定义角色 Id → 数量（-1 表示填充剩余玩家）。
+- `public virtual CustomTeam? Team { get; }` — 波次的主阵营（取 Teams 首个）；为空时不参与自定义敌我关系。
+- `public virtual IReadOnlyList<CustomTeam> Teams { get; }` — 本波次归属的自定义阵营实例列表。
+- `public IReadOnlyList<CustomRole> Roles { get; }` — 本波次包含的自定义角色（由角色侧的 WaveIds 反向填充）。
+- `public virtual bool ModifyThreat { get; }` — 是否参与设施威胁指数调整。
+- `public virtual float CustomThreat { get; }` — 自定义威胁调整值；小于零时由处理器按波次威胁等级计算。
+- `public virtual bool SpawnProtect { get; }` — 是否为生成的玩家附带出生保护。
+- `public virtual float SpawnProtectDuration { get; }` — 出生保护时长（秒）；-1 表示使用框架默认值。
+- `public virtual string? Announcement { get; }` — Announcer 播报正文；null 表示不播报。
+- `public virtual string? AnnouncementTranslation { get; }` — Announcer 播报的翻译键或译文；null 表示不翻译。
+- `public virtual Color WaveColor { get; }` — 波次配色，默认取 Team 的配色。
+- `protected virtual float DefaultSpawnProtectDuration { get; }` — 默认出生保护时长（秒）。
+- `public virtual IReadOnlyList<Player> Spawn(IEnumerable<Player> players)` — 按 Table 把玩家分配到各角色并套用。
+- `public virtual bool CheckAllowSpawn(Player player)` — 判断玩家是否允许被本波次刷新。
+- `protected virtual void OnWavePlayerSpawned(Player player)` — 单个玩家生成完成后的钩子。
+- `protected virtual void OnWaveSpawned(IReadOnlyList<Player> players)` — 全部玩家生成完成后的钩子。
+
+#### `CustomWaveApi`
+
+`public static class CustomWaveApi`
+
+源码：`src/Astra.Framework/Waves/CustomWaveApi.cs`
+
+> 自定义波次对外 API：角色生成器注册与波次执行。
+
+- `public static IReadOnlyDictionary<string, CustomWave> Waves { get; }` — 当前回合的全部波次实例。
+- `public static ICustomWaveRoleSpawner? RoleSpawner { get; }` — 当前生效的角色生成器。
+- `public static CustomWave? Find(string id)` — 按 Id 查找当前回合的波次实例。
+- `public static T? Find<T>() where T : CustomWave` — 按类型查找波次实例。
+- `public static bool TryFind<T>(out T wave) where T : CustomWave` — 按类型查找波次实例。
+- `public static void Initialize()` — 按模板实例化波次（幂等，框架启动时自动调用，须晚于阵营实例化）。
+- `public static void RegisterTemplate(Type type)` — 登记波次模板（框架自动扫描时调用，通常无需手动）。
+- `public static void SetRoleSpawner(ICustomWaveRoleSpawner spawner)` — 注册角色生成器（宿主插件在启动时调用一次）。
+- `public static void SetRoleSpawner(Func<string, Player, bool> trySpawn)` — 用委托注册角色生成器。
+- `public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> players)` — 执行波次：按波次表把玩家刷成对应角色。
+
+#### `DelegatedWaveSorter<T>`
+
+`public sealed class DelegatedWaveSorter<T> : IWaveSorter<T>`
+
+源码：`src/Astra.Framework/Waves/DelegatedWaveSorter.cs`
+
+> 用委托实现的排序器，便于调用方临时指定比较逻辑而不必新建类型。
+
+- `public DelegatedWaveSorter(Comparison<T> comparison)` — 用比较委托构造排序器。
+- `public int Compare(T left, T right)`
+
+#### `ICustomWaveRoleSpawner`
+
+`public interface ICustomWaveRoleSpawner`
+
+源码：`src/Astra.Framework/Waves/ICustomWaveRoleSpawner.cs`
+
+> 波次刷新角色的抽象出口：把「自定义角色 Id + 玩家」交给宿主实现。
+
+- `bool TrySpawn(string roleId, Player player)` — 把玩家套用为指定自定义角色。
+
+#### `IWaveSorter<in T>`
+
+`public interface IWaveSorter<in T>`
+
+源码：`src/Astra.Framework/Waves/IWaveSorter.cs`
+
+> 波次排序器：决定候选波次的优先级顺序。
+
+- `int Compare(T left, T right)` — 比较两个波次的优先级。
+
+#### `IWaveSpawnRole`
+
+`public interface IWaveSpawnRole`
+
+源码：`src/Astra.Framework/Waves/IWaveSpawnRole.cs`
+
+> 参与波次刷新的角色契约：声明归属的波次与刷新数量。
+
+- `IReadOnlyList<CustomWave> Waves { get; }` — 归属的波次实例列表。
+- `int WaveSpawnCount { get; }` — 在每个归属波次中的刷新数量；-1 表示填充剩余玩家。
+
+#### `WaveComposition`
+
+`public sealed class WaveComposition`
+
+源码：`src/Astra.Framework/Waves/ICustomWaveRoleSpawner.cs`
+
+> 波次角色统计：某个波次刷新了哪些角色、各多少。
+
+- `public void Add(string roleId, int count)` — 累加一个角色的刷新数量。
+- `public IReadOnlyDictionary<string, int> ToTable()` — 导出为只读字典。
+
+#### `WaveSorterExtensions`
+
+`public static class WaveSorterExtensions`
+
+源码：`src/Astra.Framework/Waves/DelegatedWaveSorter.cs`
+
+> 排序器的便捷扩展。
+
+- `public static List<T> Sort<T>(this IWaveSorter<T> sorter, IEnumerable<T> waves)` — 按排序器的优先级返回一个新列表（靠前者优先）。
+
+---
+
+### 附录 A：缺 `<summary>` 的公开类型
+
+AGENTS.md §5.2 要求公开类型必须有 XML 文档；以下类型尚未补齐。
+
+- `Astra.ICustomContent` — `src/Astra.Framework/ICustomContent.cs`
+- `Astra.Abilities.IAbilityRole` — `src/Astra.Framework/Abilities/IAbilityRole.cs`
+- `Astra.Attributes.PatchApiVersionAttribute` — `src/Astra.Framework/Attributes/PatchApiVersionAttribute.cs`
+- `Astra.Attributes.PatchGameVersionAttribute` — `src/Astra.Framework/Attributes/PatchGameVersionAttribute.cs`
+- `Astra.Effects.CustomEffect` — `src/Astra.Framework/Effects/CustomEffect.cs`
+- `Astra.Effects.IEffects` — `src/Astra.Framework/Effects/IEffects.cs`
+- `Astra.Events.EventHandlerStatus` — `src/Astra.Framework/Events/EventManager.cs`
+- `Astra.HumeShield.CustomHumeShieldEventHandler` — `src/Astra.Framework/HumeShield/CustomHumeShieldEventHandler.cs`
+- `Astra.Patching.PatchStatus` — `src/Astra.Framework/Patching/PatchManager.cs`
+- `Astra.Roles.CustomRole` — `src/Astra.Framework/Roles/CustomRole.cs`
+- `Astra.Roles.IOriginalRole` — `src/Astra.Framework/Roles/IOriginalRole.cs`
+- `Astra.Roles.StandardRole` — `src/Astra.Framework/Roles/StandardRole.cs`
+
+---
+
+### 附录 B：框架内部类型（`internal`，非对外 API）
+
+| 类型 | 命名空间 | 源码 | 说明 |
+| --- | --- | --- | --- |
+| `CustomAbilityTemplateManager` | `Astra.Abilities` | `src/Astra.Framework/Abilities/CustomAbilityTemplateManager.cs` | 技能模板管理器：保存全局技能模板（按 Id / Type 索引）， 并监听玩家加… |
+| `AudioManager` | `Astra.Audio` | `src/Astra.Framework/Audio/AudioManager.cs` | 音频管理器：回合重启时自动归还所有音频播放器到对象池。 |
+| `TokenManager` | `Astra.Cancellation` | `src/Astra.Framework/Cancellation/TokenManager.cs` | 取消令牌管理器：监听玩家加入 / 离开与回合重启，维护各类 Cancellati… |
+| `TokenSources` | `Astra.Cancellation` | `src/Astra.Framework/Cancellation/TokenSources.cs` | 各类 CancellationTokenSource 的持有者。 |
+| `EffectApplier` | `Astra.Effects` | `src/Astra.Framework/Effects/EffectApplier.cs` | 批量施加 / 解除 EffectEntry 的入口。 |
+| `EffectCatalog` | `Astra.Effects` | `src/Astra.Framework/Effects/EffectCatalog.cs` | EffectType 与游戏效果类型之间的映射表。 |
+| `EventManager` | `Astra.Events` | `src/Astra.Framework/Events/EventManager.cs` | 自定义事件处理器登记、启停与统一卸载管理器。 |
+| `CustomHumeShieldManager` | `Astra.HumeShield` | `src/Astra.Framework/HumeShield/CustomHumeShieldManager.cs` | 自定义角色的休谟护盾驱动器。 |
+| `CustomItemManager` | `Astra.Items` | `src/Astra.Framework/Items/CustomItemManager.cs` | 自定义物品的模板登记、一次性实例化与原版物品类型映射。 |
+| `VersionGuard` | `Astra.Loader` | `src/Astra.Framework/Loader/VersionGuard.cs` | 版本门禁：按 PatchApiVersionAttribute / PatchG… |
+| `ComponentApplyPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/ComponentApplyPatch.cs` | 为玩家挂载 CustomEffectController：在 Reference… |
+| `CustomTeamDamageMultiplierPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 伤害倍率：让 ProcessDamage 的友伤折扣跟随自定义阵营。 |
+| `CustomTeamExplosionEffectPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 爆炸附加效果（灼烧 / 耳鸣 / 脑震荡）：友军不吃。 |
+| `CustomTeamExplosionFriendlyPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 爆炸伤害：自定义阵营判定为友好时完全免除爆炸伤害。 |
+| `CustomTeamFlashbangFriendlyPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 闪光弹：自定义阵营判定为友好时，不闪光、不耳鸣、不计入命中数。 |
+| `CustomTeamFriendlyFireDetectorPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 让原版「友伤检测（自动处罚）」尊重自定义阵营关系。 |
+| `CustomTeamHostilityPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 用自定义阵营关系接管原版「敌我判定」。 |
+| `CustomTeamScp079CampingPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | SCP-079 扫描器：计算「区域敌人数量」时排除与 SCP 明确友好的阵营。 |
+| `CustomTeamScp079TrackingPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | SCP-079 扫描器：与 SCP 明确友好的自定义阵营不进入 TrackedP… |
+| `CustomTeamScp096GateTranspiler` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | SCP-096 挥击门禁转译：把 ProcessHits 里的 IsEnemy(… |
+| `CustomTeamScp096HitPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | SCP-096 近战：与 SCP 明确友好的阵营不吃 096 的挥击伤害。 |
+| `ExplodeOwnerPatch` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 在 Explode 执行期间记录投掷者，供效果补丁查询。 |
+| `ExplodeOwnerScope` | `Astra.Patches` | `src/Astra.Framework/Patches/CustomTeamHostilityPatch.cs` | 爆炸投掷者作用域（栈式，兼容嵌套爆炸）。 |
+| `Shooting` | `Astra.Patches` | `src/Astra.Framework/Patches/ShotBacktrackDataPatch.cs` | Patches ProcessShot. Adds the Shooting e… |
+| `ShotTarget` | `Astra.Patches` | `src/Astra.Framework/Patches/HitscanHitregModuleBasePatch.cs` | Patches ServerApplyDestructibleDamage. A… |
+| `PatchManager` | `Astra.Patching` | `src/Astra.Framework/Patching/PatchManager.cs` | Astra 托管 Harmony 补丁的登记、启停与统一卸载管理器。 |
+| `CustomRoleManager` | `Astra.Roles` | `src/Astra.Framework/Roles/CustomRoleManager.cs` | — |
+| `CustomRoleTemplateManager` | `Astra.Roles` | `src/Astra.Framework/Roles/CustomRoleTemplateManager.cs` | — |
+| `CustomWaveManager` | `Astra.Waves` | `src/Astra.Framework/Waves/CustomWaveManager.cs` | 自定义波次的模板登记、一次性实例化与双向关联维护。 |
+| `CustomWaveRoleSpawner` | `Astra.Waves` | `src/Astra.Framework/Waves/ICustomWaveRoleSpawner.cs` | 波次角色生成器的静态注册点。 |
+
+<!-- AUTO-GEN:END -->
+
+## 4. 维护约定
+
+### 4.1 生成与校验
+
+```bash
+# 仓库根执行；需要 .NET 10 SDK，Roslyn 版本取自 Directory.Packages.props 的中央版本
+dotnet run tools/ApiDoc.cs             # 重新生成 §3 自动段
+dotnet run tools/ApiDoc.cs -- --check  # 只校验：与源码漂移则退出码 1
+```
+
+- 自动段只覆盖 `AUTO-GEN` 标记之间的内容；标记外的手写章节（§1、§2、§4）不会被脚本改写。
+- 生成结果不含时间戳：同一份源码产出同一份字节，diff 只会是真实的 API 变化。
+- 收录口径：`public` 与 `protected` 成员计入（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不计入，内部类型见附录 B。
+
+### 4.2 破坏性变更
+
+| 变更 | 版本 | 额外动作 |
+| --- | --- | --- |
+| 新增公开类型 / 成员 | MINOR | 重新生成 §3 |
+| 删除 / 改名 / 改公开签名 | **MAJOR** | 提交信息标注 `BREAKING`；重新生成 §3，并同步 `docs/STANDARD.md` 中的类型清单 |
+| 仅改内部实现 | PATCH | — |
+
+新增公开 API 前先自问「业务真的需要直接调用它吗」，能 `internal` 就 `internal`（AGENTS.md §6）。
+
+### 4.3 已知文档缺口
+
+- 附录 A 列出的公开类型尚无 XML `<summary>`。AGENTS.md §5.2 要求公开类型必须有文档注释，补齐后重新生成即可从清单移除。
+- 按子系统展开的教程在 `src/Astra.Framework/DEVELOPMENT.md`。该文写于 v2 重构之前（`Astra.Interfaces`、`EventManager.Instance` 等已不存在），与本文冲突时以 §3 清单和源码为准。
