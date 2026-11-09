@@ -16,6 +16,11 @@ namespace Astra.Teams;
 /// <see cref="PlayerRoles.Team"/> 与 <see cref="Astra.Teams.CustomTeam"/> 都可隐式转换为本类型，
 /// 因此声明阵营时直接写原版枚举或自定义阵营实例即可。
 /// </para>
+/// <para>
+/// 本类型也可隐式转换为 <see cref="PlayerRoles.Team"/>（返回 <see cref="VanillaTeam"/>），便于把
+/// <c>TeamRef</c> 当作原版阵营使用；但 <c>switch</c> 的常量模式要求常量本身可隐式转换为被匹配类型，
+/// 这个方向不成立，需要按原版阵营分支时请显式写 <c>team.VanillaTeam</c>。
+/// </para>
 /// </remarks>
 public readonly struct TeamRef : IEquatable<TeamRef>
 {
@@ -65,6 +70,11 @@ public readonly struct TeamRef : IEquatable<TeamRef>
     /// <param name="team">自定义阵营。</param>
     /// <returns>含自定义阵营的引用。</returns>
     public static implicit operator TeamRef(CustomTeam team) => FromCustom(team);
+
+    /// <summary>阵营引用隐式转换为原版阵营（自定义阵营时取其 <see cref="Astra.Teams.CustomTeam.VanillaTeam"/> 锚点）。</summary>
+    /// <param name="team">阵营引用。</param>
+    /// <returns>原版阵营。</returns>
+    public static implicit operator Team(TeamRef team) => team.VanillaTeam;
 
     /// <inheritdoc />
     public bool Equals(TeamRef other) =>

@@ -74,7 +74,7 @@
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 90 个（class 62 / enum 8 / interface 16 / struct 4），命名空间 19 个；公开成员 588 个。
+- **统计**：公开类型 90 个（class 62 / enum 8 / interface 16 / struct 4），命名空间 19 个；公开成员 589 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -1439,6 +1439,7 @@
 - `public override string ToString()`
 - `public static implicit operator TeamRef(Team team)` — 原版阵营隐式转换为阵营引用。
 - `public static implicit operator TeamRef(CustomTeam team)` — 自定义阵营隐式转换为阵营引用。
+- `public static implicit operator Team(TeamRef team)` — 阵营引用隐式转换为原版阵营（自定义阵营时取其 VanillaTeam 锚点）。
 - `public static bool operator ==(TeamRef left, TeamRef right)` — 比较两个阵营引用是否相同（自定义阵营按实例、原版阵营按枚举值）。
 - `public static bool operator !=(TeamRef left, TeamRef right)` — 比较两个阵营引用是否不同。
 
