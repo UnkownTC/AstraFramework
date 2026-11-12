@@ -19,6 +19,8 @@ namespace Astra.Items;
 /// <item>数值/属性：派生类以属性声明，由使用方自行读取。</item>
 /// <item>事件：<see cref="OnShooting"/> 只在派生类覆写时才会被框架转发——覆写即表示接管开火，
 /// 返回 <see langword="false"/> 阻止原版；不覆写时框架不介入射击，原版行为保持不变。</item>
+/// <item>生命周期与交互（获得 / 装备 / 收起 / 拾取 / 丢弃 / 使用 / 投掷）均有对应的虚方法，
+/// 默认空实现，覆写即接管。</item>
 /// </list>
 /// </remarks>
 public abstract class CustomItem : IIdentifiable
@@ -57,12 +59,52 @@ public abstract class CustomItem : IIdentifiable
     {
     }
 
+    /// <summary>物品被装备（切换到手持）时调用。</summary>
+    /// <param name="player">玩家。</param>
+    /// <param name="item">被装备的物品实例。</param>
+    public virtual void OnEquipped(Player player, Item item)
+    {
+    }
+
+    /// <summary>物品被收起（从手持切走）时调用。</summary>
+    /// <param name="player">玩家。</param>
+    /// <param name="item">被收起的物品实例。</param>
+    public virtual void OnHolstered(Player player, Item item)
+    {
+    }
+
+    /// <summary>物品被拾取时调用。</summary>
+    /// <param name="player">玩家。</param>
+    /// <param name="item">被拾取的物品实例。</param>
+    public virtual void OnPickedUp(Player player, Item item)
+    {
+    }
+
     /// <summary>物品被丢弃时调用。</summary>
     /// <param name="player">丢弃物品的玩家。</param>
     /// <param name="pickup">地面物品。</param>
     public virtual void OnDropped(Player player, Pickup pickup)
     {
     }
+
+    /// <summary>物品被使用前调用；返回 <see langword="false"/> 阻止本次使用。</summary>
+    /// <param name="player">玩家。</param>
+    /// <param name="item">被使用的物品实例。</param>
+    /// <returns>允许使用返回 <see langword="true"/>。</returns>
+    public virtual bool OnUsing(Player player, UsableItem item) => true;
+
+    /// <summary>物品使用完成后调用。</summary>
+    /// <param name="player">玩家。</param>
+    /// <param name="item">被使用的物品实例。</param>
+    public virtual void OnUsed(Player player, UsableItem item)
+    {
+    }
+
+    /// <summary>物品被投掷前调用；返回 <see langword="false"/> 阻止本次投掷。</summary>
+    /// <param name="player">玩家。</param>
+    /// <param name="pickup">将被投掷的地面物品。</param>
+    /// <returns>允许投掷返回 <see langword="true"/>。</returns>
+    public virtual bool OnThrowing(Player player, Pickup pickup) => true;
 
     /// <summary>给玩家发放本物品。</summary>
     /// <param name="player">目标玩家。</param>
@@ -72,7 +114,7 @@ public abstract class CustomItem : IIdentifiable
         if (player is null)
             return null;
 
-        var item = player.AddItem(BaseItem);
+        var item = CreateItem(player);
         if (item is null)
             return null;
 
@@ -80,4 +122,10 @@ public abstract class CustomItem : IIdentifiable
         OnAcquired(player, item);
         return item;
     }
+
+    /// <summary>创建待发放的物品实例；默认发放 <see cref="BaseItem"/>。</summary>
+    /// <param name="player">目标玩家。</param>
+    /// <returns>物品实例；失败为 <see langword="null"/>。</returns>
+    /// <remarks>覆写后可自定义初始状态（弹药、挂件、序列号等），<see cref="Give"/> 会继续完成登记与回调。</remarks>
+    protected virtual Item? CreateItem(Player player) => player.AddItem(BaseItem);
 }

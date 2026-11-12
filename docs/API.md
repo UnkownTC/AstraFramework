@@ -58,7 +58,7 @@
 | 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`）。阵营归属读 `Team`（`TeamRef`，同时兼容自定义阵营与原版阵营） |
 | 自定义阵营 | `CustomTeam` | 查询 `CustomTeamApi.Teams` / `Find` / `Find<T>` | 一次性实例化、跨回合复用，可直接持有实例引用 |
 | 自定义波次 | `CustomWave`（声明 `Id` / `Name` / `Teams`）；角色侧实现 `IWaveSpawnRole` 声明归属波次与数量 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`CustomWaveApi.SetRoleSpawner`）；执行 `CustomWaveApi.Spawn(wave, players)` | 波次刷新表由角色聚合，波次本身不维护数量；主阵营读 `Team`（`TeamRef`，兼容自定义/原版阵营）；未注册生成器时 `Spawn` 记 Error 并返回空 |
-| 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火 |
+| 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火；装备 / 拾取 / 使用 / 投掷 / 换弹 / 瞄准 / 命中均有可覆写钩子 |
 | 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明 |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
 | 休谟护盾 | `ICustomHumeShieldStat`（`StandardRole` 已实现） | 随角色套用自动接管生灭 | `HumeShieldCurve` 非空时以曲线为准 |
@@ -74,7 +74,7 @@
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 90 个（class 62 / enum 8 / interface 16 / struct 4），命名空间 19 个；公开成员 589 个。
+- **统计**：公开类型 90 个（class 62 / enum 8 / interface 16 / struct 4），命名空间 19 个；公开成员 612 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -1013,7 +1013,7 @@
 
 源码：`src/Astra.Framework/Items/CustomFirearm.cs`
 
-> 自定义枪械：在 CustomItem 之上补充射击数值与开火行为。
+> 自定义枪械：在 CustomItem 之上补充射击数值，以及开火 / 换弹 / 空枪 / 瞄准 / 命中结算等扩展点。
 
 - `protected CustomFirearm(ItemType baseItem)` — 构造：指定承载的原版枪械类型。
 - `public override ItemType BaseItem { get; }`
@@ -1024,6 +1024,11 @@
 - `public virtual int Penetration { get; }` — 穿透力（可穿透的目标数）。
 - `public virtual float Spread { get; }` — 扩散角（度）。
 - `public float FireInterval { get; }` — 射击间隔（秒），由 FireRate 推导。
+- `public virtual bool OnReloading(Player player, FirearmItem firearm)` — 换弹开始时调用；返回 false 阻止本次换弹。
+- `public virtual void OnReloaded(Player player, FirearmItem firearm)` — 换弹完成时调用。
+- `public virtual bool OnDryFiring(Player player, FirearmItem firearm)` — 空仓扣扳机时调用；返回 false 阻止原版空枪反馈。
+- `public virtual void OnAiming(Player player, FirearmItem firearm)` — 玩家举枪瞄准时调用。
+- `public virtual void OnShot(ShotEventArgs ev)` — 子弹命中结算时调用，可修改 CanHurt 等字段或自行结算伤害。
 
 #### `CustomItem`
 
@@ -1040,8 +1045,15 @@
 - `public virtual float Weight { get; }` — 物品重量；-1 表示使用原版默认值。
 - `public virtual bool OnShooting(ShootingEventArgs ev)` — 射击事件（仅对枪械类物品有意义）：返回 false 阻止原版射击。
 - `public virtual void OnAcquired(Player player, Item item)` — 物品被玩家获得时调用。
+- `public virtual void OnEquipped(Player player, Item item)` — 物品被装备（切换到手持）时调用。
+- `public virtual void OnHolstered(Player player, Item item)` — 物品被收起（从手持切走）时调用。
+- `public virtual void OnPickedUp(Player player, Item item)` — 物品被拾取时调用。
 - `public virtual void OnDropped(Player player, Pickup pickup)` — 物品被丢弃时调用。
+- `public virtual bool OnUsing(Player player, UsableItem item)` — 物品被使用前调用；返回 false 阻止本次使用。
+- `public virtual void OnUsed(Player player, UsableItem item)` — 物品使用完成后调用。
+- `public virtual bool OnThrowing(Player player, Pickup pickup)` — 物品被投掷前调用；返回 false 阻止本次投掷。
 - `public virtual Item? Give(Player player)` — 给玩家发放本物品。
+- `protected virtual Item? CreateItem(Player player)` — 创建待发放的物品实例；默认发放 BaseItem。
 
 #### `CustomItemApi`
 
@@ -1069,9 +1081,20 @@
 
 源码：`src/Astra.Framework/Items/CustomItemEventHandler.cs`
 
-> 自定义物品的事件转发：把玩家行为交给对应的 CustomItem 决定是否拦截。
+> 自定义物品的事件转发：把玩家与物品的交互交给对应的 CustomItem 处理。
 
 - `public override void OnExiledShooting(ShootingEventArgs ev)` — 射击：仅当自定义物品覆写了 OnShooting 时转发，返回 false 则阻止原版开火。
+- `public override void OnExiledShot(ShotEventArgs ev)` — 命中结算：转发给自定义枪械。
+- `public override void OnPlayerChangedItem(PlayerChangedItemEventArgs ev)` — 切换手持物品：向旧物品转发收起、向新物品转发装备。
+- `public override void OnPlayerPickedUpItem(PlayerPickedUpItemEventArgs ev)` — 拾取物品：转发给自定义物品。
+- `public override void OnPlayerDroppedItem(PlayerDroppedItemEventArgs ev)` — 丢弃物品：转发给自定义物品。
+- `public override void OnPlayerUsingItem(PlayerUsingItemEventArgs ev)` — 使用物品前：返回 false 可阻止本次使用。
+- `public override void OnPlayerUsedItem(PlayerUsedItemEventArgs ev)` — 使用完成：转发给自定义物品。
+- `public override void OnPlayerThrowingItem(PlayerThrowingItemEventArgs ev)` — 投掷前：返回 false 可阻止本次投掷。
+- `public override void OnPlayerReloadingWeapon(PlayerReloadingWeaponEventArgs ev)` — 开始换弹：转发给自定义枪械，返回 false 可阻止。
+- `public override void OnPlayerReloadedWeapon(PlayerReloadedWeaponEventArgs ev)` — 换弹完成：转发给自定义枪械。
+- `public override void OnPlayerDryFiringWeapon(PlayerDryFiringWeaponEventArgs ev)` — 空仓扣扳机：转发给自定义枪械，返回 false 可阻止。
+- `public override void OnPlayerAimedWeapon(PlayerAimedWeaponEventArgs ev)` — 举枪瞄准：转发给自定义枪械。
 
 #### `CustomJailbird`
 
