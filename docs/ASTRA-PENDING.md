@@ -139,12 +139,91 @@ public void AddEffect(CustomEffect effect)
 
 ---
 
+### 4.4 支援波次池
+
+**依据**：业务侧 5 处调用 `SupportPool` / `SetSupportWaveWeight` / `PickSupportWave` / `GetSupportWavesWithFallback` / `WaveSpawned`。
+`WaveScheduler` 只解决「队列推进」，不解决「支援池轮换 + 池空回退」。
+
+**新增文件**：`Waves/SupportWavePool.cs`
+
+| 成员 | 语义 |
+|---|---|
+| `void Register(CustomWave wave, int weight)` | 登记支援波次；权重默认取 `IWeightedWave.Weight`，未实现则取传入值 |
+| `bool SetWeight(string waveId, int weight)` | 调整权重；Id 不存在返回 `false` |
+| `IReadOnlyCollection<CustomWave> Waves` | 池内全部波次 |
+| `CustomWave? Pick(int playerCount)` | 按权重随机（权重和为分母），跳过不满足 `MinPlayers/MaxPlayers` 的项 |
+| `IReadOnlyList<CustomWave> GetWithFallback(int playerCount)` | 池空或全部不满足时返回兜底序列（按权重降序的全部候选），供调用方降级 |
+| `event Action<CustomWave>? WaveSpawned` | 波次完成生成后触发，供业务挂钩 |
+
+**新增文件**：`Waves/WaveScheduler` 扩展（同文件内加成员）
+
+| 成员 | 语义 |
+|---|---|
+| `SupportWavePool Support { get; }` | 内置支援池实例 |
+| `CustomWave? PickSupportWave(int playerCount)` | 转发 `Support.Pick`，并记录为 `Current` |
+
+**验收**：两个权重 3:1 的支援波次，100 次取样比例接近 3:1；全部不满足人数门槛时 `GetWithFallback` 返回非空序列。
+
+---
+
+### 4.5 原版波次分发标记
+
+**依据**：业务侧用 `VanillaWaveAdapter.IsDispatchingRespawnEvent` 区分「本次刷新来自原版波次」还是「来自自定义波次」（2 个文件）。
+
+**新增文件**：`Waves/VanillaWaveDispatch.cs`
+
+```csharp
+public static class VanillaWaveDispatch
+{
+    // 当前线程/栈上是否处于原版波次分发过程中
+    public static bool IsDispatching { get; }
+
+    // 作用域包装：进入时置位，Dispose 时复位（用 using 包裹原版 RespawnWave 调用）
+    public static IDisposable Begin();
+}
+```
+
+**新增文件**：`Waves/VanillaWaveAdapter.cs`
+
+| 成员 | 语义 |
+|---|---|
+| `static bool IsDispatchingRespawnEvent` | 转发 `VanillaWaveDispatch.IsDispatching` |
+| `static bool TryGetVanillaWave(object source, out int waveIndex)` | 从原版事件源解析波次序号，解析失败返回 `false` |
+
+**实现要求**：`Begin()` 必须是可嵌套的计数器（而不是布尔），避免原版波次内部再触发时提前复位。
+
+**验收**：`using (VanillaWaveDispatch.Begin()) { ... }` 期间 `IsDispatching` 为 `true`，退出后恢复 `false`；嵌套两层时内层结束后仍为 `true`。
+
+---
+
+### 4.6 `CustomWaveApi` 补执行入口
+
+**依据**：`CustomWaveApi` 目前只有 `Waves` / `Find` / `Register` / `Initialize`，业务侧 2 处直接调 `WaveManager.Spawn`，迁移后无公开方法可用。
+
+**修改文件**：`Waves/CustomWaveApi.cs`
+
+```csharp
+/// <summary>按 Id 立即执行波次。</summary>
+public static IReadOnlyList<Player> Spawn(string waveId, IEnumerable<Player> players)
+    => CustomWaveManager.Find(waveId)?.Spawn(players) ?? [];
+
+/// <summary>立即执行指定波次实例。</summary>
+public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> players)
+    => wave?.Spawn(players) ?? [];
+```
+
+**职责边界**：只做「查表 + 转发 `CustomWave.Spawn`」，不在 Api 里写生成逻辑。
+
+**验收**：`CustomWaveApi.Spawn("测试波次", players)` 返回实际套用的玩家列表；Id 不存在时返回空集合且不抛异常。
+
+---
+
 ### 4.3 影响面与验证
 
 | 项 | 内容 |
 |---|---|
-| 新增公开类型 | `IWeightedWave`、`WeightedWaveAdapter`、`WaveScheduler` |
-| 修改公开类型 | `CustomEffect`（+2 成员）、`CustomEffectController`（行为分支） |
+| 新增公开类型 | `IWeightedWave`、`WeightedWaveAdapter`、`WaveScheduler`、`SupportWavePool`、`VanillaWaveDispatch`、`VanillaWaveAdapter` |
+| 修改公开类型 | `CustomEffect`（+2 成员）、`CustomEffectController`（行为分支）、`CustomWaveApi`（+2 重载） |
 | 兼容性 | 非破坏性：`CanStack` 默认 false、`Weight` 接口可选实现 |
 | 验证 | Astra 独立编译 0 error；`WaveScheduler` 单测覆盖「权重排序 / 人数跳过 / 队列耗尽」 |
 | 版本 | MINOR（3.0.1 → 3.1.0） |
@@ -159,5 +238,8 @@ public void AddEffect(CustomEffect effect)
 | 2 | 异常日志能打出完整链路 | 已完成 |
 | 3 | 一个方法可标注多个 `[PatchMethod]` 并全部生效 | 已完成（3.0.1） |
 | 4 | §4.1 加权波次可排序并跳过人数不足的波次 | 已完成（3.1.0） |
-| 5 | §4.2 可叠加效果层数与强度按规格变化 | 已完成（3.1.0） |
+| 5 | §4.2 可叠加效果层数与强度按规格变化 |
+| 6 | §4.4 支援池按权重取样，池空可回退 |
+| 7 | §4.5 原版波次标记可嵌套且能正确复位 |
+| 8 | §4.6 `CustomWaveApi.Spawn` 可用 | 已完成（3.1.0） |
 | 6 | 版本号升级（新增能力） | 已完成（3.0.0 → 3.0.1 缺陷修复；3.0.1 → 3.1.0 新增能力） |
