@@ -131,6 +131,12 @@
     <Compile Include="Cancellation\CancellationTokenApi.cs" />
     <Compile Include="Cancellation\TokenManager.cs" />
     <Compile Include="Cancellation\TokenSources.cs" />
+    <Compile Include="Commands\CommandSupport.cs" />
+    <Compile Include="Commands\CustomAbilityCommand.cs" />
+    <Compile Include="Commands\CustomItemCommand.cs" />
+    <Compile Include="Commands\CustomRoleCommand.cs" />
+    <Compile Include="Commands\CustomTeamCommand.cs" />
+    <Compile Include="Commands\CustomWaveCommand.cs" />
     <Compile Include="Config.cs" />
     <Compile Include="Countdown\CountdownApi.cs" />
     <Compile Include="Countdown\CountdownManager.cs" />

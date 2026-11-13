@@ -68,13 +68,27 @@
 | 取消令牌 | — | `CancellationTokenApi` + `CancellationTokenCategory` | 按类别随玩家加入 / 离开、回合重启统一取消 |
 | 服务器专属设置 | `ServerSpecificSettingBase` | 实现 `IIdentifiable` 即自动登记，启动后统一下发 | 技能按键复用其中的 SSKeybindSetting |
 
+### 2.1 RA 指令
+
+| 指令 | 别名 | 子指令 | 说明 |
+| --- | --- | --- | --- |
+| `customrole` | `crole` | `list` / `info <Id\|Name>` / `get <玩家>` / `give <玩家> <Id\|Name>` | 自定义角色 |
+| `customability` | `cability` | 同上 | 自定义技能 |
+| `customitem` | `citem` | 同上 | 自定义物品 |
+| `customteam` | `cteam` | `list` / `info <Id\|Name>` | 自定义阵营（不归属玩家，不提供 get / give） |
+| `customwave` | `cwave` | `list` / `info <Id\|Name>` | 自定义波次（不归属玩家，不提供 get / give） |
+
+- 模板匹配：先按 `Id`、再按 `Name`（均忽略大小写）。
+- 玩家匹配：SteamId → PlayerId → Nickname；SteamId / Nickname 需全字匹配且忽略大小写。
+- 权限：`list` / `info` 需 `PlayerPermissions.GameplayData`；`get` 需 `PlayerSensitiveDataAccess`；`give` 分别需 `ForceclassWithoutRestrictions`（角色）、`Effects`（技能）、`GivingItems`（物品）。
+
 ## 3. 公开 API 清单
 
 <!-- AUTO-GEN:BEGIN（由 tools/ApiDoc.cs 生成，勿手改） -->
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 90 个（class 62 / enum 8 / interface 16 / struct 4），命名空间 19 个；公开成员 622 个。
+- **统计**：公开类型 95 个（class 67 / enum 8 / interface 16 / struct 4），命名空间 20 个；公开成员 642 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -86,6 +100,7 @@
 | `Astra.Attributes` | `DisableAutoRegisterAttribute`、`EventMethodAttribute`、`ManagedEventAttribute`、`ManagedPatchAttribute`、`PatchApiVersionAttribute`、`PatchGameVersionAttribute`、`PatchMethodAttribute` |
 | `Astra.Audio` | `AudioApi` |
 | `Astra.Cancellation` | `CancellationTokenApi` |
+| `Astra.Commands` | `CustomAbilityCommand`、`CustomItemCommand`、`CustomRoleCommand`、`CustomTeamCommand`、`CustomWaveCommand` |
 | `Astra.Countdown` | `CountdownApi`、`CountdownManager` |
 | `Astra.Effects` | `CustomEffect`、`CustomEffectApi`、`CustomEffectController`、`CustomEffectHandler`、`Effect`、`EffectEntry`、`IEffects` |
 | `Astra.Enums` | `AbilityFailReason`、`CancellationTokenCategory`、`EffectClassification`、`EffectType`、`HintPosition`、`KeybindType` |
@@ -450,6 +465,84 @@
 - `public static CancellationToken GetPlayersToken(Player player)` — 获取与指定玩家绑定的取消令牌，玩家离开时自动取消。
 - `public static CancellationToken GetRoundRestartToken()` — 获取回合重启时取消的令牌。
 - `public static CancellationToken GetFrameworkDisableToken()` — 获取框架禁用时取消的令牌。
+
+
+### `Astra.Commands`
+
+#### `CustomAbilityCommand`
+
+`public sealed class CustomAbilityCommand : ICommand`
+
+特性：`[CommandHandler(typeof(RemoteAdminCommandHandler))]`
+
+源码：`src/Astra.Framework/Commands/CustomAbilityCommand.cs`
+
+> 自定义技能（CustomAbility）的 RA 指令。
+
+- `public string Command { get; }`
+- `public string[] Aliases { get; }`
+- `public string Description { get; }`
+- `public bool Execute(ArraySegment<string> arguments, ICommandSender sender, out string response)`
+
+#### `CustomItemCommand`
+
+`public sealed class CustomItemCommand : ICommand`
+
+特性：`[CommandHandler(typeof(RemoteAdminCommandHandler))]`
+
+源码：`src/Astra.Framework/Commands/CustomItemCommand.cs`
+
+> 自定义物品（CustomItem）的 RA 指令。
+
+- `public string Command { get; }`
+- `public string[] Aliases { get; }`
+- `public string Description { get; }`
+- `public bool Execute(ArraySegment<string> arguments, ICommandSender sender, out string response)`
+
+#### `CustomRoleCommand`
+
+`public sealed class CustomRoleCommand : ICommand`
+
+特性：`[CommandHandler(typeof(RemoteAdminCommandHandler))]`
+
+源码：`src/Astra.Framework/Commands/CustomRoleCommand.cs`
+
+> 自定义角色（CustomRole）的 RA 指令。
+
+- `public string Command { get; }`
+- `public string[] Aliases { get; }`
+- `public string Description { get; }`
+- `public bool Execute(ArraySegment<string> arguments, ICommandSender sender, out string response)`
+
+#### `CustomTeamCommand`
+
+`public sealed class CustomTeamCommand : ICommand`
+
+特性：`[CommandHandler(typeof(RemoteAdminCommandHandler))]`
+
+源码：`src/Astra.Framework/Commands/CustomTeamCommand.cs`
+
+> 自定义阵营（CustomTeam）的 RA 指令；阵营不归属玩家，因此不提供 get / give。
+
+- `public string Command { get; }`
+- `public string[] Aliases { get; }`
+- `public string Description { get; }`
+- `public bool Execute(ArraySegment<string> arguments, ICommandSender sender, out string response)`
+
+#### `CustomWaveCommand`
+
+`public sealed class CustomWaveCommand : ICommand`
+
+特性：`[CommandHandler(typeof(RemoteAdminCommandHandler))]`
+
+源码：`src/Astra.Framework/Commands/CustomWaveCommand.cs`
+
+> 自定义波次（CustomWave）的 RA 指令；波次不归属玩家，因此不提供 get / give。
+
+- `public string Command { get; }`
+- `public string[] Aliases { get; }`
+- `public string Description { get; }`
+- `public bool Execute(ArraySegment<string> arguments, ICommandSender sender, out string response)`
 
 
 ### `Astra.Countdown`
