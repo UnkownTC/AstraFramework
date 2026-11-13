@@ -224,6 +224,9 @@
     <Compile Include="Waves\IWaveSpawnCountProvider.cs" />
     <Compile Include="Waves\IWaveSpawnRole.cs" />
     <Compile Include="Waves\IWeightedWave.cs" />
+    <Compile Include="Waves\SupportWavePool.cs" />
+    <Compile Include="Waves\VanillaWaveAdapter.cs" />
+    <Compile Include="Waves\VanillaWaveDispatch.cs" />
     <Compile Include="Waves\WaveScheduler.cs" />
     <Compile Include="Waves\WaveSpawnEntry.cs" />
     <Compile Include="Waves\WeightedWaveAdapter.cs" />

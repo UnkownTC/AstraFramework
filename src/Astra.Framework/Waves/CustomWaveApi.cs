@@ -68,10 +68,17 @@ public static class CustomWaveApi
     /// <param name="spawner">生成器实现。</param>
     public static void AddRoleSpawner(ICustomWaveRoleSpawner spawner) => CustomWaveRoleSpawner.Add(spawner);
 
-    /// <summary>执行波次：按波次表把玩家刷成对应角色。</summary>
+    /// <summary>按 Id 立即执行波次。</summary>
+    /// <param name="waveId">波次 Id。</param>
+    /// <param name="players">候选玩家。</param>
+    /// <returns>成功套用的玩家；Id 不存在时为空集合。</returns>
+    public static IReadOnlyList<Player> Spawn(string waveId, IEnumerable<Player> players) =>
+        CustomWaveManager.Find(waveId)?.Spawn(players) ?? Array.Empty<Player>();
+
+    /// <summary>立即执行指定波次实例。</summary>
     /// <param name="wave">波次实例。</param>
     /// <param name="players">候选玩家。</param>
-    /// <returns>成功套用的玩家。</returns>
+    /// <returns>成功套用的玩家；实例为空时为空集合。</returns>
     public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> players) =>
-        wave.Spawn(players);
+        wave?.Spawn(players) ?? Array.Empty<Player>();
 }

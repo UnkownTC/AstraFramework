@@ -32,6 +32,21 @@ public sealed class WaveScheduler
     /// <summary>尚未推进的波次数量。</summary>
     public int Remaining => Math.Max(0, _queue.Count - _index);
 
+    /// <summary>内置支援波次池。</summary>
+    public SupportWavePool Support { get; } = new();
+
+    /// <summary>从支援池抽取一个波次，并记录为当前波次。</summary>
+    /// <param name="playerCount">当前人数。</param>
+    /// <returns>抽中的波次；没有满足门槛的项时为 <see langword="null"/>。</returns>
+    public CustomWave? PickSupportWave(int playerCount)
+    {
+        var wave = Support.Pick(playerCount);
+        if (wave is not null)
+            Current = wave;
+
+        return wave;
+    }
+
     /// <summary>覆盖式装载波次，按权重排序并重置游标。</summary>
     /// <param name="waves">候选波次。</param>
     /// <returns>装载后的队列长度。</returns>

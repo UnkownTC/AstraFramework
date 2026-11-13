@@ -1,4 +1,4 @@
-# Astra 待补清单（截至 2026-11-14，基线 3.0.1）
+# Astra 待补清单（截至 2026-11-14，基线 3.2.0）
 
 > 本文件只列**当前仍然缺的**。已修项在 §3 留档，避免重复劳动。
 > 与 PluginContent 迁移相关的其余能力见 `MIGRATION-PLUGINCONTENT.md`。
@@ -37,7 +37,7 @@
 ## 4. 待建能力（PluginContent 迁移前置）
 
 以下两项不是缺陷，是 Astra 目前缺失的能力；补齐后 PluginContent 才能脱离 FirearmPack。
-**（已于 2026-11-14 在 3.1.0 实现并提交；验收状态见 §5。）**
+**（4.1 / 4.2 于 3.1.0 实现；4.4 / 4.5 / 4.6 于 3.2.0 实现；验收状态见 §5。）**
 
 ---
 
@@ -140,7 +140,7 @@ public void AddEffect(CustomEffect effect)
 
 ---
 
-### 4.4 支援波次池
+### 4.4 支援波次池（已实现，3.2.0）
 
 **依据**：业务侧 5 处调用 `SupportPool` / `SetSupportWaveWeight` / `PickSupportWave` / `GetSupportWavesWithFallback` / `WaveSpawned`。
 `WaveScheduler` 只解决「队列推进」，不解决「支援池轮换 + 池空回退」。
@@ -156,7 +156,7 @@ public void AddEffect(CustomEffect effect)
 | `IReadOnlyList<CustomWave> GetWithFallback(int playerCount)` | 池空或全部不满足时返回兜底序列（按权重降序的全部候选），供调用方降级 |
 | `event Action<CustomWave>? WaveSpawned` | 波次完成生成后触发，供业务挂钩 |
 
-**新增文件**：`Waves/WaveScheduler` 扩展（同文件内加成员）
+**修改文件**：`Waves/WaveScheduler.cs`（同文件内加成员）
 
 | 成员 | 语义 |
 |---|---|
@@ -167,7 +167,7 @@ public void AddEffect(CustomEffect effect)
 
 ---
 
-### 4.5 原版波次分发标记
+### 4.5 原版波次分发标记（已实现，3.2.0）
 
 **依据**：业务侧用 `VanillaWaveAdapter.IsDispatchingRespawnEvent` 区分「本次刷新来自原版波次」还是「来自自定义波次」（2 个文件）。
 
@@ -205,7 +205,7 @@ public static class VanillaWaveDispatch
 
 ---
 
-### 4.6 `CustomWaveApi` 补执行入口
+### 4.6 `CustomWaveApi` 补执行入口（已实现，3.2.0）
 
 **依据**：`CustomWaveApi` 目前只有 `Waves` / `Find` / `Register` / `Initialize`，业务侧 2 处直接调 `WaveManager.Spawn`，迁移后无公开方法可用。
 
@@ -235,7 +235,7 @@ public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> p
 | 修改公开类型 | `CustomEffect`（+2 成员）、`CustomEffectController`（行为分支）、`CustomWaveApi`（+2 重载） |
 | 兼容性 | 非破坏性：`CanStack` 默认 false、`Weight` 接口可选实现 |
 | 验证 | Astra 独立编译 0 error；`WaveScheduler` 单测覆盖「权重排序 / 人数跳过 / 队列耗尽」 |
-| 版本 | MINOR（3.0.1 → 3.1.0） |
+| 版本 | MINOR（3.0.1 → 3.1.0 / 3.1.0 → 3.2.0） |
 
 ---
 
@@ -247,8 +247,8 @@ public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> p
 | 2 | 异常日志能打出完整链路 | 已完成 |
 | 3 | 一个方法可标注多个 `[PatchMethod]` 并全部生效 | 已完成（3.0.1） |
 | 4 | §4.1 加权波次可排序并跳过人数不足的波次 | 已完成（3.1.0） |
-| 5 | §4.2 可叠加效果层数与强度按规格变化 |
-| 6 | §4.4 支援池按权重取样，池空可回退 |
-| 7 | §4.5 原版波次标记可嵌套且能正确复位 |
-| 8 | §4.6 `CustomWaveApi.Spawn` 可用 | 已完成（3.1.0） |
-| 6 | 版本号升级（新增能力） | 已完成（3.0.0 → 3.0.1 缺陷修复；3.0.1 → 3.1.0 新增能力） |
+| 5 | §4.2 可叠加效果层数与强度按规格变化 | 已完成（3.1.0） |
+| 6 | §4.4 支援池按权重取样，池空可回退 | 已完成（3.2.0） |
+| 7 | §4.5 原版波次标记可嵌套且能正确复位 | 已完成（3.2.0） |
+| 8 | §4.6 `CustomWaveApi.Spawn` 可用 | 已完成（3.2.0，by-id + 实例重载） |
+| 9 | 版本号升级（新增能力） | 已完成（3.0.0 → 3.0.1 缺陷修复；3.0.1 → 3.1.0 新增能力） |
