@@ -93,7 +93,6 @@ if (patchMethod.GetCustomAttributes<PatchMethodAttribute>().Any())
 
 | 能力 | 状态 |
 |---|---|
-| `Roles/RoleBase.cs`（承接 FirearmPack 的 CustomRoleBase 使用面） | 待建；3.0.0 起 `CustomRole.Items` 已是 `IReadOnlyList<ItemEntry>`，字符串 Id 可用 `ItemEntry.Custom(id)` 直接桥接 |
 | 加权波次（`IWeightedWave` / `WeightedWaveAdapter` / `WaveScheduler`） | 待建 |
 | 效果叠加策略（`CanStack` / `StackCount`） | 待建 |
 
