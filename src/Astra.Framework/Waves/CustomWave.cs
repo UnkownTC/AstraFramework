@@ -36,10 +36,11 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
     /// 刷新配置：自定义角色 Id → 数量（<c>-1</c> 表示填充剩余玩家）。
     /// </summary>
     /// <remarks>
-    /// 由 <see cref="Roles"/> 中实现 <see cref="IWaveSpawnRole"/> 的角色聚合而成，
-    /// 波次本身不再维护刷新表——角色是数量与归属的唯一来源。
+    /// 由 <see cref="Roles"/> 中实现 <see cref="IWaveSpawnRole"/> 的角色聚合而成；
+    /// 实现 <see cref="IWaveSpawnCountProvider"/> 的角色可按波次声明不同数量（优先于
+    /// <see cref="IWaveSpawnRole.WaveSpawnCount"/>）。波次本身不再维护刷新表——角色是数量与归属的唯一来源。
     /// </remarks>
-    public IReadOnlyDictionary<string, int> Table
+    public virtual IReadOnlyDictionary<string, int> Table
     {
         get
         {
@@ -47,7 +48,9 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
 
             foreach (var role in Roles)
             {
-                if (role is IWaveSpawnRole spawn)
+                if (role is IWaveSpawnCountProvider provider)
+                    table[role.Id] = provider.GetWaveSpawnCount(this);
+                else if (role is IWaveSpawnRole spawn)
                     table[role.Id] = spawn.WaveSpawnCount;
             }
 

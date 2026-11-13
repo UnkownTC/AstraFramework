@@ -218,6 +218,7 @@
     <Compile Include="Waves\DelegatedWaveSorter.cs" />
     <Compile Include="Waves\ICustomWaveRoleSpawner.cs" />
     <Compile Include="Waves\IWaveSorter.cs" />
+    <Compile Include="Waves\IWaveSpawnCountProvider.cs" />
     <Compile Include="Waves\IWaveSpawnRole.cs" />
   </ItemGroup>
   <ItemGroup>

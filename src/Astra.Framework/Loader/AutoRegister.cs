@@ -119,6 +119,10 @@ namespace Astra
             List<Type> items)
         {
             var registeredEvent = false;
+
+            // [DisableAutoRegister] 的内容类型只登记、不自动注册：外部桥接的适配器类型可借此避免被当成模板。
+            var disableAutoRegister = type.GetCustomAttribute<DisableAutoRegisterAttribute>() is not null;
+
             if (typeof(IIdentifiable).IsAssignableFrom(type) && !type.IsAbstract)
             {
                 if (typeof(CustomEventsHandler).IsAssignableFrom(type))
@@ -136,27 +140,27 @@ namespace Astra
                     ServerSpecificSettingManager.Register(type);
                 }
 
-                if (typeof(CustomAbility).IsAssignableFrom(type))
+                if (!disableAutoRegister && typeof(CustomAbility).IsAssignableFrom(type))
                 {
                     CustomAbilityTemplateManager.RegisterAbility(type);
                 }
 
-                if (typeof(CustomRole).IsAssignableFrom(type))
+                if (!disableAutoRegister && typeof(CustomRole).IsAssignableFrom(type))
                 {
                     roles.Add(type);   // 稍后统一注册（需波次实例就位）
                 }
 
-                if (typeof(CustomWave).IsAssignableFrom(type))
+                if (!disableAutoRegister && typeof(CustomWave).IsAssignableFrom(type))
                 {
                     waves.Add(type);   // 稍后统一注册（需阵营实例就位）
                 }
 
-                if (typeof(CustomTeam).IsAssignableFrom(type))
+                if (!disableAutoRegister && typeof(CustomTeam).IsAssignableFrom(type))
                 {
                     teams.Add(type);   // 稍后统一注册（最先处理）
                 }
 
-                if (typeof(CustomItem).IsAssignableFrom(type))
+                if (!disableAutoRegister && typeof(CustomItem).IsAssignableFrom(type))
                 {
                     items.Add(type);   // 稍后统一注册
                 }

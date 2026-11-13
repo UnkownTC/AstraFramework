@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `2.2.0`（`Directory.Build.props`） |
+| 适用版本 | `2.2.1`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -73,7 +73,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 | --- | --- | --- | --- |
 | 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`）。阵营归属读 `Team`（`TeamRef`，同时兼容自定义阵营与原版阵营） |
 | 自定义阵营 | `CustomTeam` | 查询 `CustomTeamApi.Teams` / `Find` / `Find<T>` | 一次性实例化、跨回合复用，可直接持有实例引用 |
-| 自定义波次 | `CustomWave`（声明 `Id` / `Name` / `Teams`）；角色侧实现 `IWaveSpawnRole` 声明归属波次与数量 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`CustomWaveApi.SetRoleSpawner`）；执行 `CustomWaveApi.Spawn(wave, players)` | 波次刷新表由角色聚合，波次本身不维护数量；主阵营读 `Team`（`TeamRef`，兼容自定义/原版阵营）；未注册生成器时 `Spawn` 记 Error 并返回空 |
+| 自定义波次 | `CustomWave`（声明 `Id` / `Name` / `Teams`）；角色侧实现 `IWaveSpawnRole` 声明归属波次与数量 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`CustomWaveApi.SetRoleSpawner`）；执行 `CustomWaveApi.Spawn(wave, players)` | 波次刷新表由角色聚合，波次本身不维护数量；角色可实现 `IWaveSpawnCountProvider` 按波次声明不同数量（优先于 `WaveSpawnCount`）；主阵营读 `Team`（`TeamRef`，兼容自定义/原版阵营）；未注册生成器时 `Spawn` 记 Error 并返回空 |
 | 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火；装备 / 拾取 / 使用 / 投掷 / 换弹 / 瞄准 / 命中均有可覆写钩子 |
 | 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明 |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
@@ -104,7 +104,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 95 个（class 67 / enum 8 / interface 16 / struct 4），命名空间 20 个；公开成员 649 个。
+- **统计**：公开类型 96 个（class 67 / enum 8 / interface 17 / struct 4），命名空间 20 个；公开成员 650 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -130,7 +130,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 | `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`StandardRole` |
 | `Astra.ServerSpecificSettings` | `ServerSpecificSettingBase`、`ServerSpecificSettingManager` |
 | `Astra.Teams` | `CustomTeam`、`CustomTeamApi`、`CustomTeamRelation`、`CustomTeamResolver`、`RelationEntry`、`RelationEntryKind`、`TeamRef` |
-| `Astra.Waves` | `CustomWave`、`CustomWaveApi`、`DelegatedWaveSorter<T>`、`ICustomWaveRoleSpawner`、`IWaveSorter<in T>`、`IWaveSpawnRole`、`WaveComposition`、`WaveSorterExtensions` |
+| `Astra.Waves` | `CustomWave`、`CustomWaveApi`、`DelegatedWaveSorter<T>`、`ICustomWaveRoleSpawner`、`IWaveSorter<in T>`、`IWaveSpawnCountProvider`、`IWaveSpawnRole`、`WaveComposition`、`WaveSorterExtensions` |
 
 ---
 
@@ -1600,7 +1600,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 - `public abstract string Id { get; }`
 - `public abstract string Name { get; }`
-- `public IReadOnlyDictionary<string, int> Table { get; }` — 刷新配置：自定义角色 Id → 数量（-1 表示填充剩余玩家）。
+- `public virtual IReadOnlyDictionary<string, int> Table { get; }` — 刷新配置：自定义角色 Id → 数量（-1 表示填充剩余玩家）。
 - `public virtual TeamRef Team { get; }` — 波次的主阵营：自定义阵营优先，未声明时回落到原版 OtherAlive。
 - `public virtual IReadOnlyList<CustomTeam> Teams { get; }` — 本波次归属的自定义阵营实例列表。
 - `public IReadOnlyList<CustomRole> Roles { get; }` — 本波次包含的自定义角色（角色实现 IWaveSpawnRole 时由框架反向登记）。
@@ -1671,6 +1671,16 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 > 波次排序器：决定候选波次的优先级顺序。
 
 - `int Compare(T left, T right)` — 比较两个波次的优先级。
+
+#### `IWaveSpawnCountProvider`
+
+`public interface IWaveSpawnCountProvider : IWaveSpawnRole`
+
+源码：`src/Astra.Framework/Waves/IWaveSpawnCountProvider.cs`
+
+> 角色在「按波次」粒度声明刷新数量的可选契约：优先于 WaveSpawnCount。
+
+- `int GetWaveSpawnCount(CustomWave wave)` — 获取本角色在指定波次中的刷新数量。
 
 #### `IWaveSpawnRole`
 
