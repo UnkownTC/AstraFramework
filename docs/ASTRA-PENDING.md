@@ -1,4 +1,4 @@
-# Astra 待补清单（截至 2026-11-14，基线 2.2.1）
+# Astra 待补清单（截至 2026-11-14，基线 3.0.0）
 
 > 本文件只列**当前仍然缺的**。已修项在 §3 留档，避免重复劳动。
 > 与 PluginContent 迁移相关的其余能力见 `MIGRATION-PLUGINCONTENT.md`。
@@ -93,7 +93,7 @@ if (patchMethod.GetCustomAttributes<PatchMethodAttribute>().Any())
 
 | 能力 | 状态 |
 |---|---|
-| `Roles/RoleBase.cs`（承接 FirearmPack 的 CustomRoleBase 使用面） | 待建 |
+| `Roles/RoleBase.cs`（承接 FirearmPack 的 CustomRoleBase 使用面） | 待建；3.0.0 起 `CustomRole.Items` 已是 `IReadOnlyList<ItemEntry>`，字符串 Id 可用 `ItemEntry.Custom(id)` 直接桥接 |
 | 加权波次（`IWeightedWave` / `WeightedWaveAdapter` / `WaveScheduler`） | 待建 |
 | 效果叠加策略（`CanStack` / `StackCount`） | 待建 |
 
