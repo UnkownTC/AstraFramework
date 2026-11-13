@@ -730,22 +730,22 @@
 
 > 提示（Hint）在屏幕上的显示位置。
 
-- `Center` — 屏幕中央。
-- `Left` — 屏幕左侧。
-- `Right` — 屏幕右侧。
-- `CenterTop` — 中上部。
-- `CenterTopLeft` — 中上偏左。
-- `CenterTopRight` — 中上偏右。
-- `CenterBottom` — 中下部。
+- `Center` — 屏幕中央（垂直居中区域）；适合醒目的单条通知。
+- `Left` — 屏幕左侧、垂直居中区域；适合侧边状态栏。
+- `Right` — 屏幕右侧、垂直居中区域；适合侧边状态栏。
+- `CenterTop` — 中上部；框架默认位置，适合标题类提示。
+- `CenterTopLeft` — 中上偏左；适合左上区域的状态信息。
+- `CenterTopRight` — 中上偏右；适合右上区域的状态信息。
+- `CenterBottom` — 中下部；适合副标题或补充说明。
 - `CenterBottomLeft` — 中下偏左。
 - `CenterBottomRight` — 中下偏右。
-- `Top` — 顶部。
+- `Top` — 顶部（贴屏幕上沿）；适合常驻状态栏。
 - `TopLeft` — 顶部偏左。
 - `TopRight` — 顶部偏右。
-- `Bottom` — 底部。
+- `Bottom` — 底部（贴屏幕下沿）；适合操作提示与倒计时。
 - `BottomLeft` — 底部偏左。
 - `BottomRight` — 底部偏右。
-- `Custom` — 自定义位置（需自行处理坐标）。
+- `Custom` — 自定义位置占位值；当前映射回退到 Center 的坐标（650），不会自动生效。
 
 #### `KeybindType`
 
