@@ -88,6 +88,17 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
             _roles.Add(role);
     }
 
+    /// <summary>摘除一个归属本波次的角色（角色注销时调用）。</summary>
+    /// <param name="role">角色模板实例。</param>
+    internal void RemoveRole(CustomRole role)
+    {
+        if (role is not null)
+            _roles.Remove(role);
+    }
+
+    /// <summary>清空本波次登记的角色（波次注销时调用）。</summary>
+    internal void ClearRoles() => _roles.Clear();
+
     /// <summary>是否参与设施威胁指数调整。</summary>
     public virtual bool ModifyThreat => true;
 
@@ -120,8 +131,7 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
         if (players is null || table.Count == 0)
             return Array.Empty<Player>();
 
-        var spawner = CustomWaveRoleSpawner.Current;
-        if (spawner is null)
+        if (!CustomWaveRoleSpawner.HasAny)
         {
             LabApi.Features.Console.Logger.Error(
                 $"[CustomWave] 波次 {Name}({Id}) 无法生成：未注册 ICustomWaveRoleSpawner。");
@@ -139,7 +149,7 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
             while (taken < limit && candidates.Count > 0)
             {
                 var player = candidates.Dequeue();
-                if (player is null || !spawner.TrySpawn(slot.Key, player))
+                if (player is null || !CustomWaveRoleSpawner.TrySpawn(slot.Key, player))
                     continue;
 
                 ApplySpawnProtection(player);

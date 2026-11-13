@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `2.1.0`（`Directory.Build.props`） |
+| 适用版本 | `2.2.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -51,6 +51,22 @@
 
 > 模板由 `Activator.CreateInstance` 实例化，派生类需要公开无参构造；每个玩家拿到的是 `CreateInstance()` 出来的独立副本，模板实例本身只承载「类型级」信息。
 
+### 1.4 外部内容（实例）注册
+
+C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册已实例化的模板：
+
+| 内容 | 注册 | 注销 |
+| --- | --- | --- |
+| 角色 | `CustomRoleApi.Register(role)` | `CustomRoleApi.Unregister(id)` |
+| 阵营 | `CustomTeamApi.Register(team)` | `CustomTeamApi.Unregister(id)` |
+| 波次 | `CustomWaveApi.Register(wave)` | `CustomWaveApi.Unregister(id)` |
+
+- 必须在 `OnServerPluginsEnabled`（框架自动注册完成）之后调用；阵营 / 波次在初始化前注册会返回 `false`，避免触发实例化早退导致 C# 模板丢失。
+- 同 Id 不同实例会被拒绝（不覆盖）；同实例重复注册幂等。
+- 注册顺序：阵营 → 波次 → 角色；注销顺序相反：角色 → 波次 → 阵营。
+- `Unregister` 只注销模板；玩家身上已套用的角色实例需调用方先 `RemoveRole` 摘除。
+- 波次角色生成器支持链式：`CustomWaveApi.AddRoleSpawner(...)` 按注册顺序依次尝试；`SetRoleSpawner` 仍为「替换全部」。
+
 ## 2. 扩展点速查
 
 | 我要做… | 继承 / 实现 | 用哪个入口 | 要点 |
@@ -88,7 +104,7 @@
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 95 个（class 67 / enum 8 / interface 16 / struct 4），命名空间 20 个；公开成员 642 个。
+- **统计**：公开类型 95 个（class 67 / enum 8 / interface 16 / struct 4），命名空间 20 个；公开成员 649 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -1375,6 +1391,8 @@
 - `public static IReadOnlyCollection<CustomRole> RoleTemplates { get; }` — 当前已注册的全部角色模板。
 - `public static bool TryGetRoleTemplate(string id, out CustomRole role)` — 按 Id 获取角色模板。
 - `public static bool TryGetRoleTemplate<T>(out T role) where T : CustomRole, new()` — 按类型获取角色模板。
+- `public static bool Register(CustomRole template)` — 按实例注册角色模板（外部框架 / 动态定义用）。
+- `public static bool Unregister(string id)` — 按 Id 注销角色模板。
 - `public static CustomRole? AddRole<T>(Player player) where T : CustomRole, new()` — 按泛型类型给玩家套用角色。
 - `public static CustomRole? AddRole(Player player, string id)` — 按 Id 给玩家套用角色。
 - `public static CustomRole? GetRole(Player player)` — 取玩家当前的自定义角色。
@@ -1475,6 +1493,8 @@
 - `public static bool TryFind<T>(out T team) where T : CustomTeam` — 按类型查找阵营实例。
 - `public static void Initialize()` — 按模板实例化阵营（幂等，框架启动时自动调用；跨回合复用不重建）。
 - `public static void RegisterTemplate(Type type)` — 登记阵营模板（框架自动扫描时调用，通常无需手动）。
+- `public static bool Register(CustomTeam team)` — 按实例注册阵营（外部框架 / 动态定义用）。
+- `public static bool Unregister(string id)` — 按 Id 注销阵营。
 
 #### `CustomTeamRelation`
 
@@ -1614,8 +1634,11 @@
 - `public static bool TryFind<T>(out T wave) where T : CustomWave` — 按类型查找波次实例。
 - `public static void Initialize()` — 按模板实例化波次（幂等，框架启动时自动调用，须晚于阵营实例化）。
 - `public static void RegisterTemplate(Type type)` — 登记波次模板（框架自动扫描时调用，通常无需手动）。
-- `public static void SetRoleSpawner(ICustomWaveRoleSpawner spawner)` — 注册角色生成器（宿主插件在启动时调用一次）。
-- `public static void SetRoleSpawner(Func<string, Player, bool> trySpawn)` — 用委托注册角色生成器。
+- `public static bool Register(CustomWave wave)` — 按实例注册波次（外部框架 / 动态定义用）。
+- `public static bool Unregister(string id)` — 按 Id 注销波次。
+- `public static void SetRoleSpawner(ICustomWaveRoleSpawner spawner)` — 注册角色生成器（宿主插件在启动时调用一次；会替换已有的生成器链）。
+- `public static void SetRoleSpawner(Func<string, Player, bool> trySpawn)` — 用委托注册角色生成器（会替换已有的生成器链）。
+- `public static void AddRoleSpawner(ICustomWaveRoleSpawner spawner)` — 追加角色生成器：按注册顺序依次尝试，首个成功即结束。
 - `public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> players)` — 执行波次：按波次表把玩家刷成对应角色。
 
 #### `DelegatedWaveSorter<T>`

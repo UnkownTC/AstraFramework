@@ -77,6 +77,33 @@ namespace Astra.Events;
                 TryEnableEntry(id, entry);
         }
 
+        /// <summary>
+        /// 注销单个已登记的模板实例：取消 LabAPI 订阅并触发注销回调。
+        /// </summary>
+        /// <param name="handler">已登记的实例。</param>
+        /// <returns>该实例原本已登记并成功移除时返回 <see langword="true"/>。</returns>
+        internal static bool UnregisterInstance(CustomEventsHandler handler)
+        {
+            if (handler is null || !_instanceHandlers.Remove(handler))
+                return false;
+
+            try
+            { CustomHandlersManager.UnregisterEventsHandler(handler); }
+            catch (Exception ex)
+            { Logger.Error($"[EventManager] 模板实例 {handler.GetType().FullName} 注销失败：{ex.Message}"); }
+
+            // 与注册侧对称：即使 LabAPI 注销失败也要给出清理机会。
+            if (handler is ICallOnUnregister unregisterTrigger)
+            {
+                try
+                { unregisterTrigger.OnUnregisterEvents(); }
+                catch (Exception ex)
+                { Logger.Error($"[EventManager] 模板实例 {handler.GetType().FullName} 注销回调异常：{ex.Message}"); }
+            }
+
+            return true;
+        }
+
         internal static void UnregisterAll()
         {
             foreach (var pair in _handlers.ToArray())
@@ -85,19 +112,7 @@ namespace Astra.Events;
 
             // 角色 / 技能模板实例不经 _handlers 管理，需单独注销，避免插件重载后残留订阅。
             foreach (var handler in _instanceHandlers.ToArray())
-            {
-                try
-                { CustomHandlersManager.UnregisterEventsHandler(handler); }
-                catch (Exception ex) { Logger.Error($"[EventManager] 模板实例 {handler.GetType().FullName} 注销失败：{ex.Message}"); }
-
-                // 与注册侧对称：即使 LabAPI 注销失败也要给出清理机会。
-                if (handler is ICallOnUnregister unregisterTrigger)
-                {
-                    try
-                    { unregisterTrigger.OnUnregisterEvents(); }
-                    catch (Exception ex) { Logger.Error($"[EventManager] 模板实例 {handler.GetType().FullName} 注销回调异常：{ex.Message}"); }
-                }
-            }
+                UnregisterInstance(handler);
             _instanceHandlers.Clear();
         }
 

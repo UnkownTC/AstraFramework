@@ -24,6 +24,18 @@ public static class CustomRoleApi
     public static bool TryGetRoleTemplate<T>(out T role) where T : CustomRole, new() =>
         CustomRoleTemplateManager.TryGetRoleTemplate(out role);
 
+    /// <summary>按实例注册角色模板（外部框架 / 动态定义用）。</summary>
+    /// <param name="template">角色模板实例。</param>
+    /// <returns>注册成功或同实例重复注册返回 <see langword="true"/>；Id 冲突等失败返回 <see langword="false"/>。</returns>
+    /// <remarks>须在框架自动注册完成之后调用；注册后立即可用于 <see cref="AddRole(Player, string)"/>。</remarks>
+    public static bool Register(CustomRole template) => CustomRoleTemplateManager.RegisterInstance(template);
+
+    /// <summary>按 Id 注销角色模板。</summary>
+    /// <param name="id">角色 Id。</param>
+    /// <returns>确实注销时返回 <see langword="true"/>。</returns>
+    /// <remarks>只注销模板；玩家身上已套用的角色实例需调用方先通过 <see cref="RemoveRole"/> 摘除。</remarks>
+    public static bool Unregister(string id) => CustomRoleTemplateManager.Unregister(id);
+
     /// <summary>按泛型类型给玩家套用角色。</summary>
     /// <typeparam name="T">角色类型。</typeparam>
     /// <param name="player">目标玩家。</param>

@@ -103,6 +103,17 @@ public abstract class CustomTeam : IEquatable<CustomTeam>, ICustomContent, ICall
             _waves.Add(wave);
     }
 
+    /// <summary>摘除一个归属本阵营的波次（波次注销时调用）。</summary>
+    /// <param name="wave">波次实例。</param>
+    internal void RemoveWave(CustomWave wave)
+    {
+        if (wave is not null)
+            _waves.Remove(wave);
+    }
+
+    /// <summary>是否已完成一次性实例化；外部内容只能在完成后通过实例注册进入。</summary>
+    internal static bool Initialized { get; private set; }
+
     /// <summary>当前已注册的全部自定义阵营。</summary>
     internal static IReadOnlyDictionary<string, CustomTeam> All => Registry;
 
@@ -160,6 +171,52 @@ public abstract class CustomTeam : IEquatable<CustomTeam>, ICustomContent, ICall
                 LabApi.Features.Console.Logger.Error($"[CustomTeam] 模板 {type.Name} 实例化异常：{ex.Message}");
             }
         }
+
+        Initialized = true;
+    }
+
+    /// <summary>按实例注册阵营（外部框架 / 动态定义用）。</summary>
+    /// <param name="team">阵营实例。</param>
+    /// <returns>注册成功（或同实例重复注册）时返回 <see langword="true"/>；未初始化、Id 冲突等失败返回 <see langword="false"/>。</returns>
+    internal static bool RegisterInstance(CustomTeam team)
+    {
+        if (!Initialized || team is null || string.IsNullOrWhiteSpace(team.Id))
+            return false;
+
+        if (Registry.TryGetValue(team.Id, out var occupied))
+        {
+            if (ReferenceEquals(occupied, team))
+                return true;   // 同实例重复注册：幂等
+
+            LabApi.Features.Console.Logger.Warn(
+                $"[CustomTeam] 阵营 Id {team.Id} 已被 {occupied.GetType().FullName} 占用，" +
+                $"{team.GetType().FullName} 注册被拒绝（不覆盖既有实例）。");
+            return false;
+        }
+
+        Registry[team.Id] = team;
+        NotifyRegister(team);
+        return true;
+    }
+
+    /// <summary>按 Id 注销阵营；仍被波次引用时拒绝注销（需先注销波次）。</summary>
+    /// <param name="id">阵营 Id。</param>
+    /// <returns>确实注销时返回 <see langword="true"/>。</returns>
+    internal static bool Unregister(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || !Registry.TryGetValue(id, out var team))
+            return false;
+
+        if (team.Waves.Count > 0)
+        {
+            LabApi.Features.Console.Logger.Warn(
+                $"[CustomTeam] 阵营 {id} 仍被 {team.Waves.Count} 个波次引用，拒绝注销（请先注销波次）。");
+            return false;
+        }
+
+        Registry.Remove(id);
+        NotifyUnregister(team);
+        return true;
     }
 
     /// <summary>按 Id 查找阵营。</summary>
@@ -176,6 +233,7 @@ public abstract class CustomTeam : IEquatable<CustomTeam>, ICustomContent, ICall
 
         Templates.Clear();
         Registry.Clear();
+        Initialized = false;
     }
 
     /// <summary>调用实例的登记回调；回调异常只记日志，不中断其余实例。</summary>

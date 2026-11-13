@@ -25,6 +25,9 @@ internal static class CustomWaveManager
 
     private static readonly List<Type> Templates = [];
 
+    /// <summary>是否已完成一次性实例化；外部内容只能在完成后通过实例注册进入。</summary>
+    internal static bool Initialized { get; private set; }
+
     /// <summary>当前的全部波次实例。</summary>
     internal static IReadOnlyDictionary<string, CustomWave> All => Registry;
 
@@ -87,22 +90,82 @@ internal static class CustomWaveManager
                 LabApi.Features.Console.Logger.Error($"[CustomWaveManager] 模板 {type.Name} 实例化异常：{ex.Message}");
             }
         }
+
+        Initialized = true;
     }
 
-    /// <summary>
-    /// 把角色登记到其声明的波次（角色注册时调用）。
-    /// </summary>
-    /// <param name="type">角色类型（需已注册为模板）。</param>
-    internal static void AttachRole(Type type)
+    /// <summary>按实例注册波次（外部框架 / 动态定义用）。</summary>
+    /// <param name="wave">波次实例。</param>
+    /// <returns>注册成功（或同实例重复注册）时返回 <see langword="true"/>；未初始化、Id 冲突、依赖缺失等失败返回 <see langword="false"/>。</returns>
+    internal static bool RegisterInstance(CustomWave wave)
     {
-        if (!CustomRoleTemplateManager.TryGetRoleTemplate(type, out var role) ||
-            role is not IWaveSpawnRole spawn)
+        if (!Initialized || wave is null || string.IsNullOrWhiteSpace(wave.Id))
+            return false;
+
+        if (Registry.TryGetValue(wave.Id, out var occupied))
         {
-            return;   // 未实现 IWaveSpawnRole 的角色不参与波次刷新
+            if (ReferenceEquals(occupied, wave))
+                return true;   // 同实例重复注册：幂等
+
+            LabApi.Features.Console.Logger.Warn(
+                $"[CustomWaveManager] 波次 Id {wave.Id} 已被 {occupied.GetType().FullName} 占用，" +
+                $"{wave.GetType().FullName} 注册被拒绝（不覆盖既有实例）。");
+            return false;
         }
 
-        foreach (var wave in spawn.Waves)
-            wave?.AddRole(role);
+        IReadOnlyList<CustomTeam> teams;
+        try
+        {
+            teams = wave.Teams;
+        }
+        catch (Exception ex)
+        {
+            LabApi.Features.Console.Logger.Error(
+                $"[CustomWaveManager] 波次 {wave.Id} 的 Teams 解析失败，注册被拒绝：{ex.Message}");
+            return false;
+        }
+
+        Registry[wave.Id] = wave;
+
+        foreach (var team in teams)
+        {
+            if (team is null)
+            {
+                LabApi.Features.Console.Logger.Warn(
+                    $"[CustomWaveManager] 波次 {wave.Id} 的 Teams 含 null 项，已跳过该关联。");
+                continue;
+            }
+
+            team.AddWave(wave);
+        }
+
+        NotifyRegister(wave);
+        return true;
+    }
+
+    /// <summary>按 Id 注销波次，并摘除它与阵营、角色的反向关联。</summary>
+    /// <param name="id">波次 Id。</param>
+    /// <returns>确实注销时返回 <see langword="true"/>。</returns>
+    internal static bool Unregister(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || !Registry.TryGetValue(id, out var wave))
+            return false;
+
+        Registry.Remove(id);
+
+        try
+        {
+            foreach (var team in wave.Teams)
+                team?.RemoveWave(wave);
+        }
+        catch (Exception ex)
+        {
+            LabApi.Features.Console.Logger.Error($"[CustomWaveManager] 波次 {id} 注销时摘除阵营关联失败：{ex.Message}");
+        }
+
+        wave.ClearRoles();
+        NotifyUnregister(wave);
+        return true;
     }
 
     /// <summary>按 Id 查找波次实例。</summary>
@@ -115,10 +178,14 @@ internal static class CustomWaveManager
     internal static void Clear()
     {
         foreach (var wave in Registry.Values)
+        {
+            wave.ClearRoles();
             NotifyUnregister(wave);
+        }
 
         Templates.Clear();
         Registry.Clear();
+        Initialized = false;
     }
 
     /// <summary>调用实例的登记回调；回调异常只记日志，不中断其余实例。</summary>

@@ -99,7 +99,6 @@ namespace Astra
                 try
                 {
                     CustomRoleTemplateManager.RegisterRole(type);
-                    CustomWaveManager.AttachRole(type);
                 }
                 catch (Exception ex)
                 {

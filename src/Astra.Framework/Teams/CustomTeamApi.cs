@@ -38,4 +38,15 @@ public static class CustomTeamApi
     /// <summary>登记阵营模板（框架自动扫描时调用，通常无需手动）。</summary>
     /// <param name="type">阵营类型。</param>
     public static void RegisterTemplate(Type type) => CustomTeam.RegisterTemplate(type);
+
+    /// <summary>按实例注册阵营（外部框架 / 动态定义用）。</summary>
+    /// <param name="team">阵营实例。</param>
+    /// <returns>注册成功（或同实例重复注册）返回 <see langword="true"/>；未初始化或 Id 冲突返回 <see langword="false"/>。</returns>
+    /// <remarks>须在框架自动注册完成后调用，否则会因阵营实例化早退而丢失 C# 模板。</remarks>
+    public static bool Register(CustomTeam team) => CustomTeam.RegisterInstance(team);
+
+    /// <summary>按 Id 注销阵营。</summary>
+    /// <param name="id">阵营 Id。</param>
+    /// <returns>确实注销时返回 <see langword="true"/>；仍被波次引用时返回 <see langword="false"/>。</returns>
+    public static bool Unregister(string id) => CustomTeam.Unregister(id);
 }

@@ -33,7 +33,7 @@ namespace Astra;
         public override string Description => "本框架提供了一套标准化、低耦合的架构，用于自动管理自定义事件处理器、Harmony 补丁、倒计时与提示系统，所有组件均支持通过字符串 Id 进行精确控制。";
 
         /// <inheritdoc />
-        public override Version Version { get; } = new(2, 1, 0, 0);
+        public override Version Version { get; } = new(2, 2, 0, 0);
 
         /// <inheritdoc />
         public override Version RequiredApiVersion => LabApiProperties.CurrentVersion;

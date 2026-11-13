@@ -24,8 +24,45 @@ public interface ICustomWaveRoleSpawner
 /// <summary>波次角色生成器的静态注册点。</summary>
 internal static class CustomWaveRoleSpawner
 {
-    /// <summary>当前生效的生成器；由宿主在启动时设置。</summary>
-    public static ICustomWaveRoleSpawner? Current { get; set; }
+    private static readonly List<ICustomWaveRoleSpawner> Spawners = [];
+
+    /// <summary>首个生效的生成器（兼容旧 API）；没有生成器时为 <see langword="null"/>。</summary>
+    public static ICustomWaveRoleSpawner? Current => Spawners.Count > 0 ? Spawners[0] : null;
+
+    /// <summary>是否至少注册了一个生成器。</summary>
+    public static bool HasAny => Spawners.Count > 0;
+
+    /// <summary>替换全部生成器（兼容旧 <c>SetRoleSpawner</c> 语义）。</summary>
+    /// <param name="spawner">生成器；<see langword="null"/> 表示清空。</param>
+    public static void Set(ICustomWaveRoleSpawner? spawner)
+    {
+        Spawners.Clear();
+        if (spawner is not null)
+            Spawners.Add(spawner);
+    }
+
+    /// <summary>追加生成器；按注册顺序依次尝试。</summary>
+    /// <param name="spawner">生成器。</param>
+    public static void Add(ICustomWaveRoleSpawner spawner)
+    {
+        if (spawner is not null && !Spawners.Contains(spawner))
+            Spawners.Add(spawner);
+    }
+
+    /// <summary>按注册顺序尝试生成角色，首个成功即结束。</summary>
+    /// <param name="roleId">角色 Id。</param>
+    /// <param name="player">目标玩家。</param>
+    /// <returns>任一生成器成功时返回 <see langword="true"/>。</returns>
+    public static bool TrySpawn(string roleId, Player player)
+    {
+        foreach (var spawner in Spawners)
+        {
+            if (spawner.TrySpawn(roleId, player))
+                return true;
+        }
+
+        return false;
+    }
 
     /// <summary>用委托快速构造生成器。</summary>
     /// <param name="trySpawn">套用实现。</param>
