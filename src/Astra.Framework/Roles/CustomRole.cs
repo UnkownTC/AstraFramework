@@ -150,7 +150,10 @@ namespace Astra.Roles;
 
         internal virtual void RemoveRole(Player player)
         {
-            if (Check(player))
+            // 守卫语义：玩家当前持有的是本角色时才执行清理。
+            // 原写法 if (Check(player)) return; 会让所有移除路径直接返回，
+            // 导致 OnRemoved 与 CustomInfo/Scale/Gravity/MaxHealth 回收永不执行。
+            if (!Check(player))
                 return;
 
             if (IsDestroyed)
