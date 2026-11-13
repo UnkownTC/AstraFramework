@@ -50,7 +50,7 @@ internal static class Diagnostics
 
     internal static readonly DiagnosticDescriptor PatchMethodMustBeStatic = new(
         id: "AST2001",
-        title: "[ManagedPatchMethod] 补丁方法必须是静态方法",
+        title: "[PatchMethod] 补丁方法必须是静态方法",
         messageFormat: "补丁方法 '{0}' 必须是 static，框架会拒绝注册",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
@@ -59,7 +59,7 @@ internal static class Diagnostics
 
     internal static readonly DiagnosticDescriptor PatchMethodMissingHarmonyKind = new(
         id: "AST2002",
-        title: "[ManagedPatchMethod] 缺少 Harmony 补丁类型标注",
+        title: "[PatchMethod] 缺少 Harmony 补丁类型标注",
         messageFormat: "补丁方法 '{0}' 必须标注 [HarmonyPrefix]/[HarmonyPostfix]/[HarmonyTranspiler]/[HarmonyFinalizer] 之一",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
@@ -68,8 +68,8 @@ internal static class Diagnostics
 
     internal static readonly DiagnosticDescriptor PatchMethodTargetMissing = new(
         id: "AST2003",
-        title: "[ManagedPatchMethod] 目标方法在编译期找不到",
-        messageFormat: "[ManagedPatchMethod] 目标 '{0}.{1}' 在编译期找不到匹配成员",
+        title: "[PatchMethod] 目标方法在编译期找不到",
+        messageFormat: "[PatchMethod] 目标 '{0}.{1}' 在编译期找不到匹配成员",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -120,13 +120,13 @@ internal static class Diagnostics
 
     internal static readonly DiagnosticDescriptor PatchMethodHostMustBeStatic = new(
         id: "AST5003",
-        title: "[ManagedPatchMethod] 建议放在静态类",
-        messageFormat: "类型 '{0}' 包含 [ManagedPatchMethod]，但自身不是静态类",
+        title: "[PatchMethod] 建议放在静态类",
+        messageFormat: "类型 '{0}' 包含 [PatchMethod]，但自身不是静态类",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description:
-        "补丁方法本身必须为静态方法（AZF2001 强制）；载体类用静态类更清晰，可避免实例状态与补丁生命周期耦合。");
+        "补丁方法本身必须为静态方法（AST2001 强制）；载体类用静态类更清晰，可避免实例状态与补丁生命周期耦合。");
 
     internal static readonly DiagnosticDescriptor EventMethodOutsideHandler = new(
         id: "AST5004",

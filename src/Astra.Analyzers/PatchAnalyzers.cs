@@ -7,11 +7,11 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Astra.Analyzers;
 
-/// <summary>校验 [ManagedPatchMethod] 的用法：静态、有补丁类型、目标可解析。</summary>
+/// <summary>校验 [PatchMethod] 的用法：静态、有补丁类型、目标可解析。</summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class ManagedPatchMethodAnalyzer : DiagnosticAnalyzer
+public sealed class PatchMethodAnalyzer : DiagnosticAnalyzer
 {
-    private const string AttributeName = "ManagedPatchMethod";
+    private const string AttributeName = "PatchMethod";
 
     private static readonly string[] HarmonyKindAttributes =
     [
@@ -36,7 +36,7 @@ public sealed class ManagedPatchMethodAnalyzer : DiagnosticAnalyzer
         context.RegisterSyntaxNodeAction(AnalyzeAttribute, SyntaxKind.Attribute);
     }
 
-    /// <summary>校验单个 [ManagedPatchMethod] 标注。</summary>
+    /// <summary>校验单个 [PatchMethod] 标注。</summary>
     /// <param name="context">语法节点分析上下文。</param>
     private static void AnalyzeAttribute(SyntaxNodeAnalysisContext context)
     {
@@ -164,7 +164,7 @@ public sealed class VersionAttributeAnalyzer : DiagnosticAnalyzer
     private static readonly string[] PatchAttributes =
     [
         "ManagedPatch",
-        "ManagedPatchMethod",
+        "PatchMethod",
         "HarmonyPatch",
         "HarmonyPrefix",
         "HarmonyPostfix",

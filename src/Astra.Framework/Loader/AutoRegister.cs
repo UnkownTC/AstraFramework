@@ -178,7 +178,7 @@ namespace Astra
                 PatchManager.PatchType(type, HarmonyInstance);
             }
 
-            // 方法级补丁：无需外层类标 [ManagedPatch]，由方法上的 [ManagedPatchMethod] 自带目标信息。
+            // 方法级补丁：无需外层类标 [ManagedPatch]，由方法上的 [PatchMethod] 自带目标信息。
             // 用 IsDefined 而不是单数 GetCustomAttribute：一个方法允许标注多个 [PatchMethod]。
             foreach (var patchMethod in type.GetMethods(
                          BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))

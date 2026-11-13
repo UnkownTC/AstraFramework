@@ -17,7 +17,7 @@ public sealed class ContractScopeAnalyzer : DiagnosticAnalyzer
     private const string EventHandlerBase = "CustomEventsHandler";
     private const string ManagedEventAttribute = "ManagedEventAttribute";
     private const string ManagedPatchAttribute = "ManagedPatchAttribute";
-    private const string ManagedPatchMethodAttribute = "ManagedPatchMethodAttribute";
+    private const string PatchMethodAttribute = "PatchMethodAttribute";
     private const string EventMethodAttribute = "EventMethodAttribute";
     private const string ManualPatchInterface = "IManualPatch";
 
@@ -59,6 +59,7 @@ public sealed class ContractScopeAnalyzer : DiagnosticAnalyzer
         }
 
         CheckPatchShape(context, type);
+        CheckPatchMethodHost(context, type);
         CheckInstantiationContract(context, type);
     }
 
@@ -91,6 +92,24 @@ public sealed class ContractScopeAnalyzer : DiagnosticAnalyzer
         {
             Report(context, Diagnostics.ManagedPatchStaticMismatch, type,
                 type.Name, "IManualPatch 由框架实例化调用，不能是静态类");
+        }
+    }
+
+    /// <summary>承载 [PatchMethod] 的类型建议声明为静态类。</summary>
+    /// <param name="context">符号分析上下文。</param>
+    /// <param name="type">候选类型。</param>
+    private static void CheckPatchMethodHost(SymbolAnalysisContext context, INamedTypeSymbol type)
+    {
+        if (type.IsStatic)
+            return;
+
+        var hasPatchMethod = type.GetMembers()
+            .OfType<IMethodSymbol>()
+            .Any(method => HasAttribute(method, PatchMethodAttribute));
+
+        if (hasPatchMethod)
+        {
+            Report(context, Diagnostics.PatchMethodHostMustBeStatic, type, type.Name);
         }
     }
 
