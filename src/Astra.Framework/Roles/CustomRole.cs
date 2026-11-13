@@ -24,7 +24,7 @@ namespace Astra.Roles;
 
         public abstract string Id { get; }
         public abstract string Name { get; }
-        public virtual string Description { get; set; }
+        public virtual string Description { get; set; } = string.Empty;
         /// <summary>
         /// 该实例绑定的玩家。
         /// </summary>

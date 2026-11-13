@@ -15,10 +15,10 @@ public sealed class CustomAbilityCommand : ICommand
     private const string UsageText =
         "用法：\n" +
         "  customability list — 列出全部技能模板\n" +
-        "  customability info <Id|Name> — 查看指定模板（优先按 Id 匹配）\n" +
+        "  customability info <Id> — 查看指定模板\n" +
         "  customability get <玩家> — 查看玩家拥有的技能\n" +
-        "  customability give <玩家> <Id|Name> — 给玩家授予技能\n" +
-        "玩家参数可用 SteamId / PlayerId / Nickname（SteamId 与 Nickname 全字匹配、忽略大小写）";
+        "  customability give <玩家> <Id> — 给玩家授予技能\n" +
+        "玩家参数可用 SteamId / PlayerId（不能含空格）";
 
     /// <inheritdoc />
     public string Command => "customability";
@@ -99,8 +99,8 @@ public sealed class CustomAbilityCommand : ICommand
             return false;
         }
 
-        var template = CommandSupport.MatchTemplate(
-            CustomAbilityApi.AbilityTemplates, args[1], ability => ability.Id, ability => ability.Name);
+        var template = CommandSupport.MatchById(
+            CustomAbilityApi.AbilityTemplates, args[1], ability => ability.Id);
         if (template is null)
         {
             response = CommandSupport.NoMatch(args[1]);
@@ -172,8 +172,8 @@ public sealed class CustomAbilityCommand : ICommand
             return false;
         }
 
-        var template = CommandSupport.MatchTemplate(
-            CustomAbilityApi.AbilityTemplates, args[2], ability => ability.Id, ability => ability.Name);
+        var template = CommandSupport.MatchById(
+            CustomAbilityApi.AbilityTemplates, args[2], ability => ability.Id);
         if (template is null)
         {
             response = CommandSupport.NoMatch(args[2]);

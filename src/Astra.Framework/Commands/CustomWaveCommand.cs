@@ -15,7 +15,7 @@ public sealed class CustomWaveCommand : ICommand
     private const string UsageText =
         "用法：\n" +
         "  customwave list — 列出当前回合的全部波次\n" +
-        "  customwave info <Id|Name> — 查看指定波次（优先按 Id 匹配）";
+        "  customwave info <Id> — 查看指定波次";
 
     /// <inheritdoc />
     public string Command => "customwave";
@@ -92,8 +92,8 @@ public sealed class CustomWaveCommand : ICommand
             return false;
         }
 
-        var wave = CommandSupport.MatchTemplate(
-            CustomWaveApi.Waves.Values, args[1], entry => entry.Id, entry => entry.Name);
+        var wave = CommandSupport.MatchById(
+            CustomWaveApi.Waves.Values, args[1], entry => entry.Id);
         if (wave is null)
         {
             response = CommandSupport.NoMatch(args[1]);

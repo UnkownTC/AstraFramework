@@ -33,14 +33,14 @@ internal static class CommandSupport
     /// <param name="input">使用者尝试匹配的内容。</param>
     /// <returns>反馈文本。</returns>
     public static string NoMatch(string input) =>
-        $"无法匹配：{input}（可用 SteamId / PlayerId / Nickname；SteamId 与 Nickname 需全字匹配，忽略大小写）";
+        $"无法匹配：{input}（可用 SteamId / PlayerId / 模板 Id；参数不能含空格）";
 
-    /// <summary>按 SteamId → PlayerId → Nickname 的顺序匹配在线玩家。</summary>
-    /// <param name="input">SteamId、PlayerId 或 Nickname。</param>
+    /// <summary>按 SteamId → PlayerId 的顺序匹配在线玩家；含空格等不可靠输入直接跳过。</summary>
+    /// <param name="input">SteamId 或 PlayerId。</param>
     /// <returns>匹配到的玩家；无法匹配时为 <see langword="null"/>。</returns>
     public static Player? MatchPlayer(string input)
     {
-        if (string.IsNullOrWhiteSpace(input))
+        if (string.IsNullOrWhiteSpace(input) || input.Contains(' '))
             return null;
 
         var players = Player.List;
@@ -51,30 +51,24 @@ internal static class CommandSupport
             return byUserId;
 
         if (int.TryParse(input, out var playerId))
-        {
-            var byPlayerId = players.FirstOrDefault(player => player.PlayerId == playerId);
-            if (byPlayerId is not null)
-                return byPlayerId;
-        }
+            return players.FirstOrDefault(player => player.PlayerId == playerId);
 
-        return players.FirstOrDefault(player =>
-            string.Equals(player.Nickname, input, StringComparison.OrdinalIgnoreCase));
+        return null;
     }
 
-    /// <summary>按 Id → Name 的顺序匹配模板（均忽略大小写）。</summary>
+    /// <summary>按 Id 匹配模板（忽略大小写）；含空格等不可靠输入直接跳过，不做名称兜底。</summary>
     /// <typeparam name="T">模板类型。</typeparam>
     /// <param name="templates">候选模板。</param>
-    /// <param name="key">Id 或 Name。</param>
+    /// <param name="key">模板 Id。</param>
     /// <param name="idSelector">取 Id 的委托。</param>
-    /// <param name="nameSelector">取 Name 的委托。</param>
     /// <returns>匹配到的模板；未匹配时为 <see langword="null"/>。</returns>
-    public static T? MatchTemplate<T>(IEnumerable<T> templates, string key, Func<T, string> idSelector,
-        Func<T, string> nameSelector) where T : class
+    public static T? MatchById<T>(IEnumerable<T> templates, string key, Func<T, string> idSelector) where T : class
     {
-        var byId = templates.FirstOrDefault(template =>
+        if (string.IsNullOrWhiteSpace(key) || key.Contains(' '))
+            return null;
+
+        return templates.FirstOrDefault(template =>
             string.Equals(idSelector(template), key, StringComparison.OrdinalIgnoreCase));
-        return byId ?? templates.FirstOrDefault(template =>
-            string.Equals(nameSelector(template), key, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>玩家显示格式：昵称 (SteamId) (PlayerId)。</summary>

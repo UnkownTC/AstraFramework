@@ -15,7 +15,7 @@ public sealed class CustomTeamCommand : ICommand
     private const string UsageText =
         "用法：\n" +
         "  customteam list — 列出当前回合的全部阵营\n" +
-        "  customteam info <Id|Name> — 查看指定阵营（优先按 Id 匹配）";
+        "  customteam info <Id> — 查看指定阵营";
 
     /// <inheritdoc />
     public string Command => "customteam";
@@ -92,8 +92,8 @@ public sealed class CustomTeamCommand : ICommand
             return false;
         }
 
-        var team = CommandSupport.MatchTemplate(
-            CustomTeamApi.Teams.Values, args[1], entry => entry.Id, entry => entry.Name);
+        var team = CommandSupport.MatchById(
+            CustomTeamApi.Teams.Values, args[1], entry => entry.Id);
         if (team is null)
         {
             response = CommandSupport.NoMatch(args[1]);

@@ -17,10 +17,10 @@ public sealed class CustomItemCommand : ICommand
     private const string UsageText =
         "用法：\n" +
         "  customitem list — 列出全部物品定义\n" +
-        "  customitem info <Id|Name> — 查看指定定义（优先按 Id 匹配）\n" +
+        "  customitem info <Id> — 查看指定定义\n" +
         "  customitem get <玩家> — 查看玩家持有的自定义物品\n" +
-        "  customitem give <玩家> <Id|Name> — 给玩家发放物品\n" +
-        "玩家参数可用 SteamId / PlayerId / Nickname（SteamId 与 Nickname 全字匹配、忽略大小写）";
+        "  customitem give <玩家> <Id> — 给玩家发放物品\n" +
+        "玩家参数可用 SteamId / PlayerId（不能含空格）";
 
     /// <inheritdoc />
     public string Command => "customitem";
@@ -101,8 +101,8 @@ public sealed class CustomItemCommand : ICommand
             return false;
         }
 
-        var template = CommandSupport.MatchTemplate(
-            CustomItemApi.Items.Values, args[1], item => item.Id, item => item.Name);
+        var template = CommandSupport.MatchById(
+            CustomItemApi.Items.Values, args[1], item => item.Id);
         if (template is null)
         {
             response = CommandSupport.NoMatch(args[1]);
@@ -176,8 +176,8 @@ public sealed class CustomItemCommand : ICommand
             return false;
         }
 
-        var template = CommandSupport.MatchTemplate(
-            CustomItemApi.Items.Values, args[2], item => item.Id, item => item.Name);
+        var template = CommandSupport.MatchById(
+            CustomItemApi.Items.Values, args[2], item => item.Id);
         if (template is null)
         {
             response = CommandSupport.NoMatch(args[2]);

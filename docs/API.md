@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `2.0.0`（`Directory.Build.props`） |
+| 适用版本 | `2.1.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -72,14 +72,14 @@
 
 | 指令 | 别名 | 子指令 | 说明 |
 | --- | --- | --- | --- |
-| `customrole` | `crole` | `list` / `info <Id\|Name>` / `get <玩家>` / `give <玩家> <Id\|Name>` | 自定义角色 |
+| `customrole` | `crole` | `list` / `info <Id>` / `get <玩家>` / `give <玩家> <Id>` | 自定义角色 |
 | `customability` | `cability` | 同上 | 自定义技能 |
 | `customitem` | `citem` | 同上 | 自定义物品 |
-| `customteam` | `cteam` | `list` / `info <Id\|Name>` | 自定义阵营（不归属玩家，不提供 get / give） |
-| `customwave` | `cwave` | `list` / `info <Id\|Name>` | 自定义波次（不归属玩家，不提供 get / give） |
+| `customteam` | `cteam` | `list` / `info <Id>` | 自定义阵营（不归属玩家，不提供 get / give） |
+| `customwave` | `cwave` | `list` / `info <Id>` | 自定义波次（不归属玩家，不提供 get / give） |
 
-- 模板匹配：先按 `Id`、再按 `Name`（均忽略大小写）。
-- 玩家匹配：SteamId → PlayerId → Nickname；SteamId / Nickname 需全字匹配且忽略大小写。
+- 模板匹配：只按 `Id`（忽略大小写），不做名称兜底。
+- 玩家匹配：SteamId → PlayerId；任何可能含空格的参数直接跳过，不做昵称兜底。
 - 权限：`list` / `info` 需 `PlayerPermissions.GameplayData`；`get` 需 `PlayerSensitiveDataAccess`；`give` 分别需 `ForceclassWithoutRestrictions`（角色）、`Effects`（技能）、`GivingItems`（物品）。
 
 ## 3. 公开 API 清单

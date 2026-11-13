@@ -15,10 +15,10 @@ public sealed class CustomRoleCommand : ICommand
     private const string UsageText =
         "用法：\n" +
         "  customrole list — 列出全部角色模板\n" +
-        "  customrole info <Id|Name> — 查看指定模板（优先按 Id 匹配）\n" +
+        "  customrole info <Id> — 查看指定模板\n" +
         "  customrole get <玩家> — 查看玩家当前角色\n" +
-        "  customrole give <玩家> <Id|Name> — 给玩家套用角色\n" +
-        "玩家参数可用 SteamId / PlayerId / Nickname（SteamId 与 Nickname 全字匹配、忽略大小写）";
+        "  customrole give <玩家> <Id> — 给玩家套用角色\n" +
+        "玩家参数可用 SteamId / PlayerId（不能含空格）";
 
     /// <inheritdoc />
     public string Command => "customrole";
@@ -99,8 +99,8 @@ public sealed class CustomRoleCommand : ICommand
             return false;
         }
 
-        var template = CommandSupport.MatchTemplate(
-            CustomRoleApi.RoleTemplates, args[1], role => role.Id, role => role.Name);
+        var template = CommandSupport.MatchById(
+            CustomRoleApi.RoleTemplates, args[1], role => role.Id);
         if (template is null)
         {
             response = CommandSupport.NoMatch(args[1]);
@@ -161,8 +161,8 @@ public sealed class CustomRoleCommand : ICommand
             return false;
         }
 
-        var template = CommandSupport.MatchTemplate(
-            CustomRoleApi.RoleTemplates, args[2], role => role.Id, role => role.Name);
+        var template = CommandSupport.MatchById(
+            CustomRoleApi.RoleTemplates, args[2], role => role.Id);
         if (template is null)
         {
             response = CommandSupport.NoMatch(args[2]);
