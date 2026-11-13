@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
 
+using Astra.Roles;
+
 using LabApi.Features.Wrappers;
+
+using PlayerRoles;
 
 namespace Astra.Waves;
 
@@ -59,6 +63,37 @@ internal static class CustomWaveRoleSpawner
         {
             if (spawner.TrySpawn(roleId, player))
                 return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>按注册顺序尝试生成角色条目；V2 生成器优先，旧生成器只处理自定义角色 Id。</summary>
+    /// <param name="role">角色条目（原版或自定义）。</param>
+    /// <param name="player">目标玩家。</param>
+    /// <returns>成功套用时返回 <see langword="true"/>。</returns>
+    public static bool TrySpawn(RoleEntry role, Player player)
+    {
+        foreach (var spawner in Spawners)
+        {
+            if (spawner is ICustomWaveRoleSpawnerV2 extended)
+            {
+                if (extended.TrySpawn(role, player))
+                    return true;
+
+                continue;
+            }
+
+            if (role.IsCustom &&
+                spawner.TrySpawn(role.CustomRole?.Id ?? role.CustomRoleId ?? string.Empty, player))
+                return true;
+        }
+
+        // 旧生成器链无法处理原版角色时，由框架直接套用；自定义角色必须由生成器处理。
+        if (!role.IsCustom && role.VanillaRole is not RoleTypeId.None)
+        {
+            player.SetRole(role.VanillaRole);
+            return true;
         }
 
         return false;

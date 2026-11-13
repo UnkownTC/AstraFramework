@@ -183,6 +183,7 @@
     <Compile Include="Items\CustomJailbird.cs" />
     <Compile Include="Items\CustomMicroHid.cs" />
     <Compile Include="Items\CustomParticleDisruptor.cs" />
+    <Compile Include="Items\ItemEntry.cs" />
     <Compile Include="Loader\AutoRegister.cs" />
     <Compile Include="Loader\ICallOnRegister.cs" />
     <Compile Include="Loader\ICallOnUnregister.cs" />
@@ -203,6 +204,7 @@
     <Compile Include="Roles\CustomRoleManager.cs" />
     <Compile Include="Roles\CustomRoleTemplateManager.cs" />
     <Compile Include="Roles\IOriginalRole.cs" />
+    <Compile Include="Roles\RoleEntry.cs" />
     <Compile Include="Roles\StandardRole.cs" />
     <Compile Include="ServerSpecificSettings\ServerSpecificSettingBase.cs" />
     <Compile Include="ServerSpecificSettings\ServerSpecificSettingManager.cs" />
@@ -217,9 +219,11 @@
     <Compile Include="Waves\CustomWaveManager.cs" />
     <Compile Include="Waves\DelegatedWaveSorter.cs" />
     <Compile Include="Waves\ICustomWaveRoleSpawner.cs" />
+    <Compile Include="Waves\ICustomWaveRoleSpawnerV2.cs" />
     <Compile Include="Waves\IWaveSorter.cs" />
     <Compile Include="Waves\IWaveSpawnCountProvider.cs" />
     <Compile Include="Waves\IWaveSpawnRole.cs" />
+    <Compile Include="Waves\WaveSpawnEntry.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

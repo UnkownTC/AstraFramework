@@ -33,26 +33,30 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
     public abstract string Name { get; }
 
     /// <summary>
-    /// 刷新配置：自定义角色 Id → 数量（<c>-1</c> 表示填充剩余玩家）。
+    /// 刷新配置：角色条目 → 数量（<c>-1</c> 表示填充剩余玩家）。
     /// </summary>
     /// <remarks>
-    /// 由 <see cref="Roles"/> 中实现 <see cref="IWaveSpawnRole"/> 的角色聚合而成；
-    /// 实现 <see cref="IWaveSpawnCountProvider"/> 的角色可按波次声明不同数量（优先于
-    /// <see cref="IWaveSpawnRole.WaveSpawnCount"/>）。波次本身不再维护刷新表——角色是数量与归属的唯一来源。
+    /// 由 <see cref="Roles"/> 中实现 <see cref="IWaveSpawnRole"/> 的角色聚合而成，
+    /// 再被 <see cref="Spawns"/> 中声明的条目覆盖（后者可混编原版角色）；
+    /// 实现 <see cref="IWaveSpawnCountProvider"/> 的角色可按波次声明不同数量。
     /// </remarks>
-    public virtual IReadOnlyDictionary<string, int> Table
+    public virtual IReadOnlyDictionary<RoleEntry, int> Table
     {
         get
         {
-            var table = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var table = new Dictionary<RoleEntry, int>();
 
-            foreach (var role in Roles)
+            foreach (var entry in Roles)
             {
+                var role = entry.ResolveCustom();
                 if (role is IWaveSpawnCountProvider provider)
-                    table[role.Id] = provider.GetWaveSpawnCount(this);
+                    table[entry] = provider.GetWaveSpawnCount(this);
                 else if (role is IWaveSpawnRole spawn)
-                    table[role.Id] = spawn.WaveSpawnCount;
+                    table[entry] = spawn.WaveSpawnCount;
             }
+
+            foreach (var spawn in Spawns)
+                table[spawn.Role] = spawn.Count;
 
             return table;
         }
@@ -66,29 +70,38 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
     /// 需要固定原版阵营的波次直接覆写本属性返回 <see cref="PlayerRoles.Team"/> 即可（隐式转换）。
     /// </remarks>
     public virtual TeamRef Team => Teams.Count > 0
-        ? TeamRef.FromCustom(Teams[0])
+        ? Teams[0]
         : TeamRef.FromVanilla(PlayerRoles.Team.OtherAlive);
 
     /// <summary>
-    /// 本波次归属的自定义阵营实例列表。
+    /// 本波次归属的阵营条目列表（自定义阵营与原版阵营可混编）。
     /// </summary>
     /// <remarks>
-    /// 波次初始化时框架会把本波次反向登记到这些阵营（<see cref="CustomTeam.Waves"/>）。
-    /// 阵营与波次均为一次性实例化、跨回合复用，因此可直接持有实例引用。
+    /// 波次初始化时框架会把本波次反向登记到其中的自定义阵营（<see cref="CustomTeam.Waves"/>）；
+    /// 原版阵营条目只用于配色 / 兜底。阵营与波次均为一次性实例化、跨回合复用，因此可直接持有实例引用。
     /// </remarks>
-    public virtual IReadOnlyList<CustomTeam> Teams => [];
+    public virtual IReadOnlyList<TeamRef> Teams => [];
 
-    private readonly List<CustomRole> _roles = [];
+    private readonly List<RoleEntry> _roles = [];
 
-    /// <summary>本波次包含的自定义角色（角色实现 IWaveSpawnRole 时由框架反向登记）。</summary>
-    public IReadOnlyList<CustomRole> Roles => _roles;
+    /// <summary>本波次包含的角色条目（自定义角色由 <see cref="IWaveSpawnRole"/> 反向登记）。</summary>
+    public IReadOnlyList<RoleEntry> Roles => _roles;
 
-    /// <summary>登记一个归属本波次的角色（框架在波次实例化时调用）。</summary>
+    /// <summary>
+    /// 额外声明的刷新型条目：可混编原版 / 自定义角色，并覆盖角色侧声明的数量。
+    /// </summary>
+    public virtual IReadOnlyList<WaveSpawnEntry> Spawns => [];
+
+    /// <summary>登记一个归属本波次的角色（框架在角色注册时调用）。</summary>
     /// <param name="role">角色模板实例。</param>
     internal void AddRole(CustomRole role)
     {
-        if (role is not null && !_roles.Contains(role))
-            _roles.Add(role);
+        if (role is null)
+            return;
+
+        var entry = RoleEntry.Custom(role);
+        if (!_roles.Contains(entry))
+            _roles.Add(entry);
     }
 
     /// <summary>摘除一个归属本波次的角色（角色注销时调用）。</summary>
@@ -96,7 +109,7 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
     internal void RemoveRole(CustomRole role)
     {
         if (role is not null)
-            _roles.Remove(role);
+            _roles.Remove(RoleEntry.Custom(role));
     }
 
     /// <summary>清空本波次登记的角色（波次注销时调用）。</summary>
@@ -134,10 +147,11 @@ public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnreg
         if (players is null || table.Count == 0)
             return Array.Empty<Player>();
 
-        if (!CustomWaveRoleSpawner.HasAny)
+        // 没有生成器时，纯原版角色的波次仍可由框架直接套用；含自定义角色则必须由生成器处理。
+        if (!CustomWaveRoleSpawner.HasAny && table.Keys.Any(role => role.IsCustom))
         {
             LabApi.Features.Console.Logger.Error(
-                $"[CustomWave] 波次 {Name}({Id}) 无法生成：未注册 ICustomWaveRoleSpawner。");
+                $"[CustomWave] 波次 {Name}({Id}) 无法生成：波次包含自定义角色但未注册 ICustomWaveRoleSpawner。");
             return Array.Empty<Player>();
         }
 

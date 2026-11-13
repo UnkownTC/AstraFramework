@@ -73,14 +73,10 @@ internal static class CustomWaveManager
 
                 foreach (var team in wave.Teams)
                 {
-                    if (team is null)
-                    {
-                        LabApi.Features.Console.Logger.Warn(
-                            $"[CustomWaveManager] 波次 {wave.Id} 的 Teams 含 null 项，已跳过该关联。");
-                        continue;
-                    }
+                    if (team.CustomTeam is not { } customTeam)
+                        continue;   // 原版阵营条目只用于配色 / 兜底
 
-                    team.AddWave(wave);
+                    customTeam.AddWave(wave);
                 }
 
                 NotifyRegister(wave);
@@ -113,7 +109,7 @@ internal static class CustomWaveManager
             return false;
         }
 
-        IReadOnlyList<CustomTeam> teams;
+        IReadOnlyList<TeamRef> teams;
         try
         {
             teams = wave.Teams;
@@ -129,14 +125,10 @@ internal static class CustomWaveManager
 
         foreach (var team in teams)
         {
-            if (team is null)
-            {
-                LabApi.Features.Console.Logger.Warn(
-                    $"[CustomWaveManager] 波次 {wave.Id} 的 Teams 含 null 项，已跳过该关联。");
-                continue;
-            }
+            if (team.CustomTeam is not { } customTeam)
+                continue;   // 原版阵营条目只用于配色 / 兜底
 
-            team.AddWave(wave);
+            customTeam.AddWave(wave);
         }
 
         NotifyRegister(wave);
@@ -156,7 +148,7 @@ internal static class CustomWaveManager
         try
         {
             foreach (var team in wave.Teams)
-                team?.RemoveWave(wave);
+                team.CustomTeam?.RemoveWave(wave);
         }
         catch (Exception ex)
         {

@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `2.2.1`（`Directory.Build.props`） |
+| 适用版本 | `3.0.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -65,15 +65,16 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - 同 Id 不同实例会被拒绝（不覆盖）；同实例重复注册幂等。
 - 注册顺序：阵营 → 波次 → 角色；注销顺序相反：角色 → 波次 → 阵营。
 - `Unregister` 只注销模板；玩家身上已套用的角色实例需调用方先 `RemoveRole` 摘除。
-- 波次角色生成器支持链式：`CustomWaveApi.AddRoleSpawner(...)` 按注册顺序依次尝试；`SetRoleSpawner` 仍为「替换全部」。
+- 波次角色生成器支持链式：`CustomWaveApi.AddRoleSpawner(...)` 按注册顺序依次尝试；`SetRoleSpawner` 仍为「替换全部」。实现 `ICustomWaveRoleSpawnerV2` 可接收原版 + 自定义角色条目（`RoleEntry`），旧接口只处理自定义角色 Id。
+- Entry 化：波次的 `Teams` 用 `TeamRef`、`Roles` / `Table` 用 `RoleEntry`、额外刷新项用 `WaveSpawnEntry`；角色的初始物品 `Items` 用 `ItemEntry`。
 
 ## 2. 扩展点速查
 
 | 我要做… | 继承 / 实现 | 用哪个入口 | 要点 |
 | --- | --- | --- | --- |
-| 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`）。阵营归属读 `Team`（`TeamRef`，同时兼容自定义阵营与原版阵营） |
+| 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`）。阵营归属读 `Team`（`TeamRef`）；初始物品 `Items` 用 `ItemEntry`（原版 ItemType / 自定义物品 Id，自定义物品会走 `Give`） |
 | 自定义阵营 | `CustomTeam` | 查询 `CustomTeamApi.Teams` / `Find` / `Find<T>` | 一次性实例化、跨回合复用，可直接持有实例引用 |
-| 自定义波次 | `CustomWave`（声明 `Id` / `Name` / `Teams`）；角色侧实现 `IWaveSpawnRole` 声明归属波次与数量 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`CustomWaveApi.SetRoleSpawner`）；执行 `CustomWaveApi.Spawn(wave, players)` | 波次刷新表由角色聚合，波次本身不维护数量；角色可实现 `IWaveSpawnCountProvider` 按波次声明不同数量（优先于 `WaveSpawnCount`）；主阵营读 `Team`（`TeamRef`，兼容自定义/原版阵营）；未注册生成器时 `Spawn` 记 Error 并返回空 |
+| 自定义波次 | `CustomWave`（`Id` / `Name` / `Teams`：`IReadOnlyList<TeamRef>`）；角色侧实现 `IWaveSpawnRole` 声明归属与默认数量，波次可用 `Spawns`（`WaveSpawnEntry`）额外声明 / 覆盖刷新项 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`SetRoleSpawner`）或 `ICustomWaveRoleSpawnerV2`（`AddRoleSpawner`）；执行 `CustomWaveApi.Spawn` | `Roles` / `Table` 用 `RoleEntry`（原版 + 自定义可混编）；角色可用 `IWaveSpawnCountProvider` 按波次声明数量；主阵营读 `Team`（`TeamRef`）；无生成器时原版角色由框架直接套用、自定义角色会失败 |
 | 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火；装备 / 拾取 / 使用 / 投掷 / 换弹 / 瞄准 / 命中均有可覆写钩子 |
 | 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明 |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
@@ -104,7 +105,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 96 个（class 67 / enum 8 / interface 17 / struct 4），命名空间 20 个；公开成员 650 个。
+- **统计**：公开类型 100 个（class 67 / enum 8 / interface 18 / struct 7），命名空间 20 个；公开成员 684 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -124,13 +125,13 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 | `Astra.Extensions` | `MapExtensions`、`PlayerEffectExtensions`、`PlayerExtensions` |
 | `Astra.Hints` | `HintApi`、`HintManager`、`HintPositionMapping` |
 | `Astra.HumeShield` | `CustomHumeShieldApi`、`CustomHumeShieldEventHandler`、`ICustomHumeShieldBlocker`、`ICustomHumeShieldStat` |
-| `Astra.Items` | `CustomFirearm`、`CustomItem`、`CustomItemApi`、`CustomItemEventHandler`、`CustomJailbird`、`CustomMicroHid`、`CustomParticleDisruptor` |
+| `Astra.Items` | `CustomFirearm`、`CustomItem`、`CustomItemApi`、`CustomItemEventHandler`、`CustomJailbird`、`CustomMicroHid`、`CustomParticleDisruptor`、`ItemEntry` |
 | `Astra.Loader` | `ICallOnRegister`、`ICallOnUnregister`、`IdentifiableManager<T>`、`MonoSingleton<T>` |
 | `Astra.Patching` | `IManualPatch`、`PatchApi`、`PatchStatus` |
-| `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`StandardRole` |
+| `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`RoleEntry`、`StandardRole` |
 | `Astra.ServerSpecificSettings` | `ServerSpecificSettingBase`、`ServerSpecificSettingManager` |
 | `Astra.Teams` | `CustomTeam`、`CustomTeamApi`、`CustomTeamRelation`、`CustomTeamResolver`、`RelationEntry`、`RelationEntryKind`、`TeamRef` |
-| `Astra.Waves` | `CustomWave`、`CustomWaveApi`、`DelegatedWaveSorter<T>`、`ICustomWaveRoleSpawner`、`IWaveSorter<in T>`、`IWaveSpawnCountProvider`、`IWaveSpawnRole`、`WaveComposition`、`WaveSorterExtensions` |
+| `Astra.Waves` | `CustomWave`、`CustomWaveApi`、`DelegatedWaveSorter<T>`、`ICustomWaveRoleSpawner`、`ICustomWaveRoleSpawnerV2`、`IWaveSorter<in T>`、`IWaveSpawnCountProvider`、`IWaveSpawnRole`、`WaveComposition`、`WaveSorterExtensions`、`WaveSpawnEntry` |
 
 ---
 
@@ -1258,6 +1259,28 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public virtual IReadOnlyList<Player> Fire(Player player)` — 结算一次穿透射线：从玩家视角沿朝向发射，按 PierceCount 穿透并逐层衰减。
 - `public virtual void OnFired(Player player, IReadOnlyList<Player> hits)` — 射线结算完成后的回调。
 
+#### `ItemEntry`
+
+`public readonly struct ItemEntry : IEquatable<ItemEntry>`
+
+源码：`src/Astra.Framework/Items/ItemEntry.cs`
+
+> 物品条目：同时表达「原版物品类型」与「自定义物品定义」，供角色初始物品等场景统一声明。
+
+- `public ItemType VanillaType { get; }` — 原版物品类型；自定义条目为其承载类型；未解析的 Id-only 条目为 None。
+- `public CustomItem? CustomItem { get; }` — 自定义物品定义；原版条目或尚未注册时为 null。
+- `public string? CustomItemId { get; }` — 自定义物品 Id；原版条目为 null。
+- `public bool IsCustom { get; }` — 是否为自定义物品条目。
+- `public static ItemEntry Vanilla(ItemType type)` — 声明一个原版物品条目。
+- `public static ItemEntry Custom(CustomItem item)` — 用自定义物品定义声明条目。
+- `public static ItemEntry Custom(string id)` — 用自定义物品 Id 声明条目；应用时再解析定义。
+- `public bool Equals(ItemEntry other)`
+- `public override bool Equals(object? obj)`
+- `public override int GetHashCode()`
+- `public override string ToString()`
+- `public static implicit operator ItemEntry(ItemType type)` — 原版物品类型隐式转换为条目。
+- `public static implicit operator ItemEntry(CustomItem item)` — 自定义物品定义隐式转换为条目。
+
 
 ### `Astra.Loader`
 
@@ -1367,7 +1390,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public virtual Vector3 Gravity { get; }`
 - `public virtual bool ShowCustomInfo { get; set; }`
 - `public virtual float MaxHealth { get; set; }`
-- `public virtual ItemType[] Items { get; set; }`
+- `public virtual IReadOnlyList<ItemEntry> Items { get; set; }` — 套用角色时发放的初始物品：可混用原版物品与自定义物品定义。
 - `public virtual bool ClearInventory { get; set; }`
 - `public bool IsDestroyed { get; private set; }`
 - `public virtual string RoleColor { get; }` — 角色配色，由 RoleType 推导，只读。
@@ -1406,6 +1429,28 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 源码：`src/Astra.Framework/Roles/IOriginalRole.cs`
 
 - `RoleTypeId RoleType { get; }`
+
+#### `RoleEntry`
+
+`public readonly struct RoleEntry : IEquatable<RoleEntry>`
+
+源码：`src/Astra.Framework/Roles/RoleEntry.cs`
+
+> 角色条目：同时表达「原版角色类型」与「自定义角色定义」，用于波次组成等需要混编的场景。
+
+- `public RoleTypeId VanillaRole { get; }` — 原版角色类型；自定义条目为其 RoleType；未解析时为 None。
+- `public CustomRole? CustomRole { get; }` — 自定义角色定义；原版条目或尚未注册时为 null。
+- `public string? CustomRoleId { get; }` — 自定义角色 Id；原版条目为 null。
+- `public bool IsCustom { get; }` — 是否为自定义角色条目。
+- `public static RoleEntry Vanilla(RoleTypeId role)` — 声明一个原版角色条目。
+- `public static RoleEntry Custom(CustomRole role)` — 用自定义角色定义声明条目。
+- `public static RoleEntry Custom(string id)` — 用自定义角色 Id 声明条目；解析时再查模板注册表。
+- `public bool Equals(RoleEntry other)`
+- `public override bool Equals(object? obj)`
+- `public override int GetHashCode()`
+- `public override string ToString()`
+- `public static implicit operator RoleEntry(RoleTypeId role)` — 原版角色隐式转换为条目。
+- `public static implicit operator RoleEntry(CustomRole role)` — 自定义角色隐式转换为条目。
 
 #### `StandardRole`
 
@@ -1600,10 +1645,11 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 - `public abstract string Id { get; }`
 - `public abstract string Name { get; }`
-- `public virtual IReadOnlyDictionary<string, int> Table { get; }` — 刷新配置：自定义角色 Id → 数量（-1 表示填充剩余玩家）。
+- `public virtual IReadOnlyDictionary<RoleEntry, int> Table { get; }` — 刷新配置：角色条目 → 数量（-1 表示填充剩余玩家）。
 - `public virtual TeamRef Team { get; }` — 波次的主阵营：自定义阵营优先，未声明时回落到原版 OtherAlive。
-- `public virtual IReadOnlyList<CustomTeam> Teams { get; }` — 本波次归属的自定义阵营实例列表。
-- `public IReadOnlyList<CustomRole> Roles { get; }` — 本波次包含的自定义角色（角色实现 IWaveSpawnRole 时由框架反向登记）。
+- `public virtual IReadOnlyList<TeamRef> Teams { get; }` — 本波次归属的阵营条目列表（自定义阵营与原版阵营可混编）。
+- `public IReadOnlyList<RoleEntry> Roles { get; }` — 本波次包含的角色条目（自定义角色由 IWaveSpawnRole 反向登记）。
+- `public virtual IReadOnlyList<WaveSpawnEntry> Spawns { get; }` — 额外声明的刷新型条目：可混编原版 / 自定义角色，并覆盖角色侧声明的数量。
 - `public virtual bool ModifyThreat { get; }` — 是否参与设施威胁指数调整。
 - `public virtual float CustomThreat { get; }` — 自定义威胁调整值；小于零时由处理器按波次威胁等级计算。
 - `public virtual bool SpawnProtect { get; }` — 是否为生成的玩家附带出生保护。
@@ -1662,6 +1708,16 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 - `bool TrySpawn(string roleId, Player player)` — 把玩家套用为指定自定义角色。
 
+#### `ICustomWaveRoleSpawnerV2`
+
+`public interface ICustomWaveRoleSpawnerV2 : ICustomWaveRoleSpawner`
+
+源码：`src/Astra.Framework/Waves/ICustomWaveRoleSpawnerV2.cs`
+
+> 扩展的角色生成器：同时接收原版与自定义角色条目。
+
+- `bool TrySpawn(RoleEntry role, Player player)` — 把玩家套用为指定角色条目（原版或自定义）。
+
 #### `IWaveSorter<in T>`
 
 `public interface IWaveSorter<in T>`
@@ -1713,5 +1769,20 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 > 排序器的便捷扩展。
 
 - `public static List<T> Sort<T>(this IWaveSorter<T> sorter, IEnumerable<T> waves)` — 按排序器的优先级返回一个新列表（靠前者优先）。
+
+#### `WaveSpawnEntry`
+
+`public readonly struct WaveSpawnEntry`
+
+源码：`src/Astra.Framework/Waves/WaveSpawnEntry.cs`
+
+> 波次的刷新型条目：角色（原版或自定义）+ 数量。
+
+- `public WaveSpawnEntry(RoleEntry role, int count)` — 构造刷新型条目。
+- `public RoleEntry Role { get; }` — 目标角色（原版或自定义）。
+- `public int Count { get; }` — 刷新数量；-1 表示填充剩余玩家。
+- `public static WaveSpawnEntry Custom(CustomRole role, int count)` — 用自定义角色实例创建条目。
+- `public static WaveSpawnEntry Custom(string roleId, int count)` — 用自定义角色 Id 创建条目。
+- `public static WaveSpawnEntry Vanilla(RoleTypeId role, int count)` — 用原版角色创建条目。
 
 <!-- AUTO-GEN:END -->

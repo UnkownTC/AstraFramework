@@ -102,7 +102,9 @@ public sealed class CustomWaveCommand : ICommand
 
         var teams = wave.Teams.Count == 0
             ? "无"
-            : string.Join(", ", wave.Teams.Select(team => $"{team.Name} ({team.Id})"));
+            : string.Join(", ", wave.Teams.Select(team => team.CustomTeam is { } custom
+                ? $"{custom.Name} ({custom.Id})"
+                : team.VanillaTeam.ToString()));
         response = $"波次：{wave.Name} (Id: {wave.Id})，实现类型：{wave.GetType().Name}，阵营：{teams}，" +
                    $"已登记角色数：{wave.Roles.Count}";
         return true;

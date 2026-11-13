@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 
+using Astra.Items;
 using Astra.Loader;
 using Astra.Teams;
 
@@ -41,7 +43,15 @@ namespace Astra.Roles;
         public virtual Vector3 Gravity { get; } = FpcGravityController.DefaultGravity;
         public virtual bool ShowCustomInfo { get; set; } = false;
         public virtual float MaxHealth { get; set; } = 100;
-        public virtual ItemType[] Items { get; set; } = [];
+        /// <summary>
+        /// 套用角色时发放的初始物品：可混用原版物品与自定义物品定义。
+        /// </summary>
+        /// <remarks>
+        /// 原版条目走 <c>AddItem(ItemType)</c>；自定义条目走 <see cref="CustomItem.Give"/>，
+        /// 因此会触发该物品的 <see cref="CustomItem.OnAcquired"/> 与自定义初始状态。<br/>
+        /// 自定义条目的 Id 在套用时解析，未注册则记录错误并跳过该条目。
+        /// </remarks>
+        public virtual IReadOnlyList<ItemEntry> Items { get; set; } = [];
         public virtual bool ClearInventory { get; set; } = true;
         public bool IsDestroyed { get; private set; } = false;
 
@@ -98,9 +108,24 @@ namespace Astra.Roles;
                 {
                     player.ClearInventory();
                 }
-                foreach (var item in Items)
+                foreach (var entry in Items)
                 {
-                    player.AddItem(item);
+                    if (entry.IsCustom)
+                    {
+                        var customItem = entry.ResolveCustom();
+                        if (customItem is null)
+                        {
+                            Logger.Error($"[CustomRole] 角色 {Id} 引用的自定义物品 {entry.CustomItemId} 未注册，已跳过。");
+                            continue;
+                        }
+
+                        customItem.Give(player);
+                        continue;
+                    }
+
+                    var vanillaType = entry.ResolveVanillaType();
+                    if (vanillaType is not ItemType.None)
+                        player.AddItem(vanillaType);
                 }
                 player.Scale = Scale;
                 player.Gravity = Gravity;
