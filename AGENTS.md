@@ -144,11 +144,11 @@ python tools/vsbuild.py src/Astra.Analyzers/Astra.Analyzers.csproj -p:Configurat
 
 | ID | 内容 | 级别 |
 |---|---|---|
-| AST1001~1004 | `[EventMethod]` 签名 / override / 可访问性 / 事件存在 | Error |
+| AST1001~1004 | `[EventMethod]` 签名 / override / 可访问性 / 事件存在 | Error（AST1003 为 Warning） |
 | AST2001~2003 | `[PatchMethod]` 静态 / 补丁类型 / 目标存在 | Error |
 | AST2101 | `[ManagedPatch]` 缺目标声明 | Error |
-| AST3001 | 版本特性用在非补丁成员 | Warning |
-| AST5001~5005 | 契约范围（事件基类 / 实例化契约 / 静态类） | Error |
+| AST3001 | 版本特性用在非补丁成员 | Info |
+| AST5001~5005 | 契约范围（事件基类 / 实例化契约 / 静态类） | Error（AST5003 为 Warning） |
 
 **豁免**：确有正当理由时，用 `#pragma warning disable ASTxxxx` 并附一行注释说明原因，不要静默全局关闭。
 

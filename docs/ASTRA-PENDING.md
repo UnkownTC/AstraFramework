@@ -1,4 +1,4 @@
-# Astra 待补清单（截至 2026-11-14，基线 3.2.0）
+# Astra 待补清单（截至 2026-11-14，基线 3.3.0）
 
 > 本文件只列**当前仍然缺的**。已修项在 §3 留档，避免重复劳动。
 > 与 PluginContent 迁移相关的其余能力见 `MIGRATION-PLUGINCONTENT.md`。
@@ -72,7 +72,7 @@ public interface IWeightedWave
 |---|---|
 | `WaveScheduler(Func<int>? playerCountProvider = null)` | 默认取 `Player.ReadyList.Count()` |
 | `int Load(IEnumerable<CustomWave>)` | 覆盖式装载并按权重排序，返回队列长度 |
-| `CustomWave? Advance(int? playerCount = null)` | 推进到下一个满足门槛的波次；跳过的不消耗队列语义（游标前进） |
+| `CustomWave? Advance(int? playerCount = null)` | 推进到下一个满足门槛的波次；不满足的波次被游标越过，不会在同一轮重试 |
 | `CustomWave? Current` | 当前波次 |
 | `int Remaining` | 剩余波次 |
 | `void Reset()` | 清空 |
@@ -154,7 +154,8 @@ public void AddEffect(CustomEffect effect)
 | `IReadOnlyCollection<CustomWave> Waves` | 池内全部波次 |
 | `CustomWave? Pick(int playerCount)` | 按权重随机（权重和为分母），跳过不满足 `MinPlayers/MaxPlayers` 的项 |
 | `IReadOnlyList<CustomWave> GetWithFallback(int playerCount)` | 池空或全部不满足时返回兜底序列（按权重降序的全部候选），供调用方降级 |
-| `event Action<CustomWave>? WaveSpawned` | 波次完成生成后触发，供业务挂钩 |
+| `event Action<CustomWave>? WaveSpawned` | 波次完成生成后触发，供业务挂钩；**不会由 `Pick` / `Spawn` 自动触发** |
+| `void NotifySpawned(CustomWave wave)` | 调用方在生成完成后手动调用，触发 `WaveSpawned` |
 
 **修改文件**：`Waves/WaveScheduler.cs`（同文件内加成员）
 
@@ -197,7 +198,7 @@ public static class VanillaWaveDispatch
 
 | 约束 | 说明 |
 |---|---|
-| 不拦截 | 本节只提供「读标记」能力；Astra 当前 4 个补丁（`ComponentApply` / `CustomTeamHostility` / `HitscanHitregModuleBase` / `ShotBacktrackData`）**均不触碰增援刷新**，本次也不新增 |
+| 不拦截 | 本节只提供「读标记」能力；框架自带补丁（`Patches/` 下 `ComponentApply` / `CustomTeamHostility` / `HitscanHitregModuleBase` / `ShotBacktrackData` 四个文件，部分文件内含多组 `CustomTeam*` 补丁类）**均不触碰增援刷新**，本次也不新增 |
 | 谁调用 `Begin()` | 由**业务侧**在其自身的 Harmony 补丁里包裹原版调用；Astra 不注册 respawn 相关补丁 |
 | 若需框架代劳 | 只能以「纯观察」形式：postfix / 无副作用 prefix，**不得**修改参数、返回值或取消执行 |
 
@@ -227,7 +228,7 @@ public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> p
 
 ---
 
-### 4.3 影响面与验证
+### 4.7 影响面与验证
 
 | 项 | 内容 |
 |---|---|
@@ -235,7 +236,7 @@ public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> p
 | 修改公开类型 | `CustomEffect`（+2 成员）、`CustomEffectController`（行为分支）、`CustomWaveApi`（+2 重载） |
 | 兼容性 | 非破坏性：`CanStack` 默认 false、`Weight` 接口可选实现 |
 | 验证 | Astra 独立编译 0 error；`WaveScheduler` 单测覆盖「权重排序 / 人数跳过 / 队列耗尽」 |
-| 版本 | MINOR（3.0.1 → 3.1.0 / 3.1.0 → 3.2.0） |
+| 版本 | MINOR（3.0.1 → 3.1.0 / 3.1.0 → 3.2.0；当前基线 3.3.0） |
 
 ---
 
@@ -251,4 +252,4 @@ public static IReadOnlyList<Player> Spawn(CustomWave wave, IEnumerable<Player> p
 | 6 | §4.4 支援池按权重取样，池空可回退 | 已完成（3.2.0） |
 | 7 | §4.5 原版波次标记可嵌套且能正确复位 | 已完成（3.2.0） |
 | 8 | §4.6 `CustomWaveApi.Spawn` 可用 | 已完成（3.2.0，by-id + 实例重载） |
-| 9 | 版本号升级（新增能力） | 已完成（3.0.0 → 3.0.1 缺陷修复；3.0.1 → 3.1.0 新增能力） |
+| 9 | 版本号升级（新增能力） | 已完成（3.0.0 → 3.0.1 缺陷修复；3.0.1 → 3.1.0 / 3.2.0 新增能力；3.3.0 增 RA 别名与 spawn） |

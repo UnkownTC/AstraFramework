@@ -51,7 +51,7 @@
          artifacts/build/<项目>/<Configuration>/<TFM>/   编译输出（build）
          artifacts/publish/<项目>/                   发布输出（publish）
        单个项目可退出：在 .csproj 里设 <UseWorkspaceArtifactsLayout>false</UseWorkspaceArtifactsLayout>
-       （插件类项目若其部署流程强依赖 bin/ 默认路径，可用该开关回退，但须在 DEPLOY.md 中说明）。 -->
+       （插件类项目若其部署流程强依赖 bin/ 默认路径，可用该开关回退，但须在 README.md 的产物位置说明）。 -->
   <PropertyGroup>
     <UseWorkspaceArtifactsLayout Condition="'$(UseWorkspaceArtifactsLayout)' == ''">true</UseWorkspaceArtifactsLayout>
     <WorkspaceArtifactsRoot>$(MSBuildThisFileDirectory)artifacts\</WorkspaceArtifactsRoot>
