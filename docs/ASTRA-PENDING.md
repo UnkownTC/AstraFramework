@@ -78,7 +78,8 @@ public interface IWeightedWave
 | `void Reset()` | 清空 |
 
 **门槛判定**：`MinPlayers <= count`（`MinPlayers<=0` 视为不限）且 `MaxPlayers < 0 || count <= MaxPlayers`。
-**职责边界**：只决定「顺序 + 是否需要跳过」，实际生成仍由 `CustomWave.Spawn` / `CustomWaveManager` 执行。
+**职责边界**：只决定「顺序 + 是否需要跳过」，实际生成仍由 `CustomWave.Spawn` / `CustomWaveManager` 执行；
+**不接管原版增援刷新**——原版 `RespawnWave` 流程不受本调度器影响，二者互不干扰。
 
 **验收**：3 个权重不同的波次按 Weight 顺序推进；人数不足的波次被跳过且不阻断后续波次。
 
@@ -191,6 +192,14 @@ public static class VanillaWaveDispatch
 | `static bool TryGetVanillaWave(object source, out int waveIndex)` | 从原版事件源解析波次序号，解析失败返回 `false` |
 
 **实现要求**：`Begin()` 必须是可嵌套的计数器（而不是布尔），避免原版波次内部再触发时提前复位。
+
+**边界约束（重要）**：
+
+| 约束 | 说明 |
+|---|---|
+| 不拦截 | 本节只提供「读标记」能力；Astra 当前 4 个补丁（`ComponentApply` / `CustomTeamHostility` / `HitscanHitregModuleBase` / `ShotBacktrackData`）**均不触碰增援刷新**，本次也不新增 |
+| 谁调用 `Begin()` | 由**业务侧**在其自身的 Harmony 补丁里包裹原版调用；Astra 不注册 respawn 相关补丁 |
+| 若需框架代劳 | 只能以「纯观察」形式：postfix / 无副作用 prefix，**不得**修改参数、返回值或取消执行 |
 
 **验收**：`using (VanillaWaveDispatch.Begin()) { ... }` 期间 `IsDispatching` 为 `true`，退出后恢复 `false`；嵌套两层时内层结束后仍为 `true`。
 
