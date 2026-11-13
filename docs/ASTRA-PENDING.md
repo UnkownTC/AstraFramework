@@ -34,14 +34,120 @@
 
 ---
 
-## 4. 与 PluginContent 迁移的衔接
+## 4. 待建能力（PluginContent 迁移前置）
 
-以下两项不在本清单（不是缺陷，是新增能力），进度见 `MIGRATION-PLUGINCONTENT.md`：
+以下两项不是缺陷，是 Astra 目前缺失的能力；补齐后 PluginContent 才能脱离 FirearmPack。
+**（代码已于 2026-11-14 试跑验证可编译，但按要求回滚，仅保留本规格。）**
 
-| 能力 | 状态 |
+---
+
+### 4.1 加权波次与调度器
+
+**新增文件**：`Waves/IWeightedWave.cs`、`Waves/WeightedWaveAdapter.cs`、`Waves/WaveScheduler.cs`
+**复用既有**：`IWaveSorter<in T>`、`DelegatedWaveSorter<T>.Sort()`（已存在，不重复造排序器）
+
+#### 4.1.1 `IWeightedWave`
+
+```csharp
+public interface IWeightedWave
+{
+    int Weight { get; }       // 越大越优先
+    int MinPlayers { get; }   // 触发所需最少存活人数
+    int MaxPlayers { get; }   // 上限，-1 表示不限
+}
+```
+
+#### 4.1.2 `WeightedWaveAdapter : IWaveSorter<CustomWave>`
+
+| 规则 | 说明 |
 |---|---|
-| 加权波次（`IWeightedWave` / `WeightedWaveAdapter` / `WaveScheduler`） | 待建 |
-| 效果叠加策略（`CanStack` / `StackCount`） | 待建 |
+| 权重降序 | `rightWeight.CompareTo(leftWeight)`（负数表示 left 优先） |
+| 未实现接口 | 按权重 0 处理 |
+| 权重相同 | 按 `CustomWave.Id` 序号稳定排序，避免每次刷新顺序抖动 |
+| 单例 | `public static readonly WeightedWaveAdapter Instance`（无状态） |
+
+#### 4.1.3 `WaveScheduler`
+
+| 成员 | 语义 |
+|---|---|
+| `WaveScheduler(Func<int>? playerCountProvider = null)` | 默认取 `Player.ReadyList.Count()` |
+| `int Load(IEnumerable<CustomWave>)` | 覆盖式装载并按权重排序，返回队列长度 |
+| `CustomWave? Advance(int? playerCount = null)` | 推进到下一个满足门槛的波次；跳过的不消耗队列语义（游标前进） |
+| `CustomWave? Current` | 当前波次 |
+| `int Remaining` | 剩余波次 |
+| `void Reset()` | 清空 |
+
+**门槛判定**：`MinPlayers <= count`（`MinPlayers<=0` 视为不限）且 `MaxPlayers < 0 || count <= MaxPlayers`。
+**职责边界**：只决定「顺序 + 是否需要跳过」，实际生成仍由 `CustomWave.Spawn` / `CustomWaveManager` 执行。
+
+**验收**：3 个权重不同的波次按 Weight 顺序推进；人数不足的波次被跳过且不阻断后续波次。
+
+---
+
+### 4.2 效果叠加
+
+**修改文件**：`Effects/CustomEffect.cs`、`Effects/CustomEffectController.cs`
+
+#### 4.2.1 `CustomEffect` 增量
+
+```csharp
+public virtual bool CanStack => false;          // 默认不叠加，保持现有行为
+public int StackCount { get; private set; } = 1;
+
+public void DisableEffect()
+{
+    Duration = 0f;
+    StackCount = 1;        // ← 新增：禁用时重置层数
+    ForceIntensity(0);
+}
+
+internal void Stack(float duration)             // ← 新增
+{
+    StackCount++;
+    var scaled = (byte)Mathf.Min(Intensity * StackCount, MaxIntensity);
+    SetState(scaled, duration, addDuration: true);
+}
+```
+
+#### 4.2.2 `CustomEffectController.AddEffect` 增量
+
+```csharp
+public void AddEffect(CustomEffect effect)
+{
+    if (effect is null || _effects.Contains(effect))
+        return;
+
+    // 同类效果且支持叠加：不追加实例，改为累加层数 + 抬强度 + 刷新时长
+    if (effect.CanStack && GetEffect(effect.GetType()) is { } existing)
+    {
+        existing.Stack(effect.Duration);
+        return;
+    }
+
+    _effects.Add(effect);
+}
+```
+
+| 规则 | 说明 |
+|---|---|
+| 默认行为不变 | `CanStack = false` 时与现状完全一致（同类效果仍可并存，按实例区分） |
+| 叠加强度 | `Intensity * StackCount`，`MaxIntensity` 截断 |
+| 叠加时长 | `addDuration: true`，累加而非覆盖 |
+| 关闭即清层 | `DisableEffect()` 重置 `StackCount = 1` |
+
+**验收**：`CanStack = true` 的效果连续施加两次后 `StackCount == 2`、强度翻倍（不超上限）、时长累加；`DisableEffect` 后归 1。
+
+---
+
+### 4.3 影响面与验证
+
+| 项 | 内容 |
+|---|---|
+| 新增公开类型 | `IWeightedWave`、`WeightedWaveAdapter`、`WaveScheduler` |
+| 修改公开类型 | `CustomEffect`（+2 成员）、`CustomEffectController`（行为分支） |
+| 兼容性 | 非破坏性：`CanStack` 默认 false、`Weight` 接口可选实现 |
+| 验证 | Astra 独立编译 0 error；`WaveScheduler` 单测覆盖「权重排序 / 人数跳过 / 队列耗尽」 |
+| 版本 | MINOR（2.x/3.x 内新增能力） |
 
 ---
 
@@ -51,5 +157,7 @@
 |---|---|---|
 | 1 | §1 各项完成，Astra 独立编译 0 error | 已完成（3.0.1） |
 | 2 | 异常日志能打出完整链路 | 已完成 |
-| 3 | 一个方法可标注多个 `[PatchMethod]` 并全部生效 | 已完成 |
+| 3 | 一个方法可标注多个 `[PatchMethod]` 并全部生效 |
+| 4 | §4.1 加权波次可排序并跳过人数不足的波次 |
+| 5 | §4.2 可叠加效果层数与强度按规格变化 | 已完成 |
 | 4 | 版本号升 PATCH | 已完成（3.0.0 → 3.0.1；原计划 2.2.2 因基线已到 3.0.0 顺延） |
