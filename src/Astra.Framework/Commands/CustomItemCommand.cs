@@ -26,7 +26,7 @@ public sealed class CustomItemCommand : ICommand
     public string Command => "customitem";
 
     /// <inheritdoc />
-    public string[] Aliases => new[] { "citem" };
+    public string[] Aliases => new[] { "citem", "ci" };
 
     /// <inheritdoc />
     public string Description => "Astra 自定义物品管理";

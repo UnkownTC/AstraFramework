@@ -21,7 +21,7 @@ public sealed class CustomTeamCommand : ICommand
     public string Command => "customteam";
 
     /// <inheritdoc />
-    public string[] Aliases => new[] { "cteam" };
+    public string[] Aliases => new[] { "cteam", "ct" };
 
     /// <inheritdoc />
     public string Description => "Astra 自定义阵营查询";

@@ -24,7 +24,7 @@ public sealed class CustomAbilityCommand : ICommand
     public string Command => "customability";
 
     /// <inheritdoc />
-    public string[] Aliases => new[] { "cability" };
+    public string[] Aliases => new[] { "cability", "ca" };
 
     /// <inheritdoc />
     public string Description => "Astra 自定义技能管理";

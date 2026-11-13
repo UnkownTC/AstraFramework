@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `3.2.0`（`Directory.Build.props`） |
+| 适用版本 | `3.3.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -89,15 +89,15 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 | 指令 | 别名 | 子指令 | 说明 |
 | --- | --- | --- | --- |
-| `customrole` | `crole` | `list` / `info <Id>` / `get <玩家>` / `give <玩家> <Id>` | 自定义角色 |
-| `customability` | `cability` | 同上 | 自定义技能 |
-| `customitem` | `citem` | 同上 | 自定义物品 |
-| `customteam` | `cteam` | `list` / `info <Id>` | 自定义阵营（不归属玩家，不提供 get / give） |
-| `customwave` | `cwave` | `list` / `info <Id>` | 自定义波次（不归属玩家，不提供 get / give） |
+| `customrole` | `crole` / `cr` | `list` / `info <Id>` / `get <玩家>` / `give <玩家> <Id>` | 自定义角色 |
+| `customability` | `cability` / `ca` | 同上 | 自定义技能 |
+| `customitem` | `citem` / `ci` | 同上 | 自定义物品 |
+| `customteam` | `cteam` / `ct` | `list` / `info <Id>` | 自定义阵营（不归属玩家，不提供 get / give） |
+| `customwave` | `cwave` / `cw` | `list` / `info <Id>` / `spawn <Id> [玩家]` | 自定义波次（不提供 get / give；`spawn` 直接生成，不改动波次池/调度器） |
 
 - 模板匹配：只按 `Id`（忽略大小写），不做名称兜底。
 - 玩家匹配：SteamId → PlayerId；任何可能含空格的参数直接跳过，不做昵称兜底。
-- 权限：`list` / `info` 需 `PlayerPermissions.GameplayData`；`get` 需 `PlayerSensitiveDataAccess`；`give` 分别需 `ForceclassWithoutRestrictions`（角色）、`Effects`（技能）、`GivingItems`（物品）。
+- 权限：`list` / `info` 需 `PlayerPermissions.GameplayData`；`get` 需 `PlayerSensitiveDataAccess`；`give` 分别需 `ForceclassWithoutRestrictions`（角色）、`Effects`（技能）、`GivingItems`（物品）；`spawn` 需 `PlayerPermissions.RespawnEvents`。
 
 ## 3. 公开 API 清单
 

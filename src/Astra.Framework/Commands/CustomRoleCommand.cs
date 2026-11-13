@@ -24,7 +24,7 @@ public sealed class CustomRoleCommand : ICommand
     public string Command => "customrole";
 
     /// <inheritdoc />
-    public string[] Aliases => new[] { "crole" };
+    public string[] Aliases => new[] { "crole", "cr" };
 
     /// <inheritdoc />
     public string Description => "Astra 自定义角色管理";
