@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
+using Astra.Loader;
 using Astra.Roles;
 using Astra.Teams;
 
@@ -23,7 +24,7 @@ namespace Astra.Waves;
 /// <see cref="Table"/> 的取值语义：正数为上限；<c>-1</c> 表示「填充剩余玩家」，多个 -1 条目随机分配。
 /// </para>
 /// </remarks>
-public abstract class CustomWave : IIdentifiable
+public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnregister
 {
     /// <inheritdoc />
     public abstract string Id { get; }
@@ -178,6 +179,16 @@ public abstract class CustomWave : IIdentifiable
 
         var duration = SpawnProtectDuration < 0f ? DefaultSpawnProtectDuration : SpawnProtectDuration;
         player.EnableEffect<CustomPlayerEffects.SpawnProtected>(1, duration);
+    }
+
+    /// <summary>波次实例被框架登记后调用；默认空实现，可覆写做实例级初始化。</summary>
+    public virtual void OnRegisterEvents()
+    {
+    }
+
+    /// <summary>波次实例从框架注销前调用；默认空实现，可覆写清理实例级资源。</summary>
+    public virtual void OnUnregisterEvents()
+    {
     }
 
     /// <summary>默认出生保护时长（秒）。</summary>

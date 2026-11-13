@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 
+using Astra.Loader;
 using Astra.Waves;
 
 using PlayerRoles;
@@ -38,7 +39,7 @@ namespace Astra.Teams;
 /// （如 <c>"Mtf"</c> / <c>"ChaosInsurgency"</c>）。
 /// </para>
 /// </remarks>
-public abstract class CustomTeam : IEquatable<CustomTeam>, IIdentifiable
+public abstract class CustomTeam : IEquatable<CustomTeam>, ICustomContent, ICallOnRegister, ICallOnUnregister
 {
     // 本回合的阵营实例（Id → 实例）
     private static readonly Dictionary<string, CustomTeam> Registry =
@@ -143,9 +144,11 @@ public abstract class CustomTeam : IEquatable<CustomTeam>, IIdentifiable
                     {
                         LabApi.Features.Console.Logger.Warn(
                             $"[CustomTeam] 阵营 Id 重复：{team.Id}（{existing.GetType().Name} 已被 {type.Name} 覆盖）。");
+                        NotifyUnregister(existing);
                     }
 
                     Registry[team.Id] = team;
+                    NotifyRegister(team);
                 }
                 else
                 {
@@ -168,8 +171,39 @@ public abstract class CustomTeam : IEquatable<CustomTeam>, IIdentifiable
     /// <summary>清空模板与实例（框架卸载时调用）。</summary>
     internal static void Clear()
     {
+        foreach (var team in Registry.Values)
+            NotifyUnregister(team);
+
         Templates.Clear();
         Registry.Clear();
+    }
+
+    /// <summary>调用实例的登记回调；回调异常只记日志，不中断其余实例。</summary>
+    /// <param name="team">已登记的阵营实例。</param>
+    private static void NotifyRegister(CustomTeam team)
+    {
+        try
+        {
+            team.OnRegisterEvents();
+        }
+        catch (Exception ex)
+        {
+            LabApi.Features.Console.Logger.Error($"[CustomTeam] 阵营 {team.Id} 登记回调异常：{ex.Message}");
+        }
+    }
+
+    /// <summary>调用实例的注销回调；回调异常只记日志。</summary>
+    /// <param name="team">待注销的阵营实例。</param>
+    private static void NotifyUnregister(CustomTeam team)
+    {
+        try
+        {
+            team.OnUnregisterEvents();
+        }
+        catch (Exception ex)
+        {
+            LabApi.Features.Console.Logger.Error($"[CustomTeam] 阵营 {team.Id} 注销回调异常：{ex.Message}");
+        }
     }
 
     /// <summary>
@@ -345,6 +379,16 @@ public abstract class CustomTeam : IEquatable<CustomTeam>, IIdentifiable
             return VanillaFaction != other.VanillaFaction;
 
         return true;
+    }
+
+    /// <summary>阵营实例被框架登记后调用；默认空实现，可覆写做实例级初始化。</summary>
+    public virtual void OnRegisterEvents()
+    {
+    }
+
+    /// <summary>阵营实例从框架注销前调用；默认空实现，可覆写清理实例级资源。</summary>
+    public virtual void OnUnregisterEvents()
+    {
     }
 
     /// <inheritdoc />

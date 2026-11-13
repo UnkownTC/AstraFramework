@@ -1,5 +1,7 @@
 using System;
 
+using Astra.Loader;
+
 using LabApi.Events.CustomHandlers;
 using LabApi.Features.Wrappers;
 
@@ -23,7 +25,7 @@ namespace Astra.Abilities;
     /// 或放进以 <c>ReferenceHub</c> 为键的静态表。
     /// </para>
     /// </remarks>
-    public abstract class CustomAbility : CustomEventsHandler, IIdentifiable
+    public abstract class CustomAbility : CustomEventsHandler, ICustomContent, ICallOnRegister, ICallOnUnregister
     {
         /// <summary>获取技能的全局唯一标识。</summary>
         public abstract string Id { get; }
@@ -99,6 +101,16 @@ namespace Astra.Abilities;
 
         /// <inheritdoc />
         public override int GetHashCode() => Id.GetHashCode();
+
+        /// <summary>技能模板被框架登记后调用；默认空实现，可覆写做模板级初始化。</summary>
+        public virtual void OnRegisterEvents()
+        {
+        }
+
+        /// <summary>技能模板从框架注销前调用；默认空实现，可覆写清理模板级资源。</summary>
+        public virtual void OnUnregisterEvents()
+        {
+        }
 
         /// <summary>
         /// 基于当前模板创建一个技能实例。默认使用反射无参构造，可覆写以自定义实例化逻辑。

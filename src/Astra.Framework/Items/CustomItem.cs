@@ -1,3 +1,5 @@
+using Astra.Loader;
+
 using LabApi.Features.Wrappers;
 
 using ShootingEventArgs = Astra.Events.ShootingEventArgs;
@@ -23,7 +25,7 @@ namespace Astra.Items;
 /// 默认空实现，覆写即接管。</item>
 /// </list>
 /// </remarks>
-public abstract class CustomItem : IIdentifiable
+public abstract class CustomItem : ICustomContent, ICallOnRegister, ICallOnUnregister
 {
     /// <inheritdoc />
     public abstract string Id { get; }
@@ -128,4 +130,14 @@ public abstract class CustomItem : IIdentifiable
     /// <returns>物品实例；失败为 <see langword="null"/>。</returns>
     /// <remarks>覆写后可自定义初始状态（弹药、挂件、序列号等），<see cref="Give"/> 会继续完成登记与回调。</remarks>
     protected virtual Item? CreateItem(Player player) => player.AddItem(BaseItem);
+
+    /// <summary>物品定义被框架登记后调用；默认空实现，可覆写做定义级初始化。</summary>
+    public virtual void OnRegisterEvents()
+    {
+    }
+
+    /// <summary>物品定义从框架注销前调用；默认空实现，可覆写清理定义级资源。</summary>
+    public virtual void OnUnregisterEvents()
+    {
+    }
 }

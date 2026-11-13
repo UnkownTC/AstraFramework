@@ -207,9 +207,13 @@ namespace Astra
             PatchManager.UnpatchAll();
             TokenManager.CancelAll();
             EventMethodManager.UnregisterAll();
-            CustomTeam.Clear();
-            CustomWaveManager.Clear();
+
+            // 内容按注册的逆序清空（Item → Wave → Team），最后清角色 / 技能的模板注册表。
             CustomItemManager.Clear();
+            CustomWaveManager.Clear();
+            CustomTeam.Clear();
+            CustomRoleTemplateManager.Clear();
+            CustomAbilityTemplateManager.Clear();
         }
     }
 }

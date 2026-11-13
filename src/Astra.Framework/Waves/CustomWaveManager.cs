@@ -63,6 +63,7 @@ internal static class CustomWaveManager
                 {
                     LabApi.Features.Console.Logger.Warn(
                         $"[CustomWaveManager] 波次 Id 重复：{wave.Id}（{existing.GetType().Name} 已被 {type.Name} 覆盖）。");
+                    NotifyUnregister(existing);
                 }
 
                 Registry[wave.Id] = wave;
@@ -78,6 +79,8 @@ internal static class CustomWaveManager
 
                     team.AddWave(wave);
                 }
+
+                NotifyRegister(wave);
             }
             catch (Exception ex)
             {
@@ -111,7 +114,38 @@ internal static class CustomWaveManager
     /// <summary>清空模板与实例（框架卸载时调用）。</summary>
     internal static void Clear()
     {
+        foreach (var wave in Registry.Values)
+            NotifyUnregister(wave);
+
         Templates.Clear();
         Registry.Clear();
+    }
+
+    /// <summary>调用实例的登记回调；回调异常只记日志，不中断其余实例。</summary>
+    /// <param name="wave">已登记的波次实例。</param>
+    private static void NotifyRegister(CustomWave wave)
+    {
+        try
+        {
+            wave.OnRegisterEvents();
+        }
+        catch (Exception ex)
+        {
+            LabApi.Features.Console.Logger.Error($"[CustomWaveManager] 波次 {wave.Id} 登记回调异常：{ex.Message}");
+        }
+    }
+
+    /// <summary>调用实例的注销回调；回调异常只记日志。</summary>
+    /// <param name="wave">待注销的波次实例。</param>
+    private static void NotifyUnregister(CustomWave wave)
+    {
+        try
+        {
+            wave.OnUnregisterEvents();
+        }
+        catch (Exception ex)
+        {
+            LabApi.Features.Console.Logger.Error($"[CustomWaveManager] 波次 {wave.Id} 注销回调异常：{ex.Message}");
+        }
     }
 }

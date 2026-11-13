@@ -1,5 +1,6 @@
 using System;
 
+using Astra.Loader;
 using Astra.Teams;
 
 using LabApi.Events.Arguments.PlayerEvents;
@@ -16,7 +17,7 @@ using UnityEngine;
 using Logger = LabApi.Features.Console.Logger;
 
 namespace Astra.Roles;
-    public abstract class CustomRole : CustomEventsHandler, ICustomContent, IOriginalRole
+    public abstract class CustomRole : CustomEventsHandler, ICustomContent, IOriginalRole, ICallOnRegister, ICallOnUnregister
     {
         /// <summary>套用角色前的血量上限，用于收口时回滚。</summary>
         private float _originalMaxHealth;
@@ -173,6 +174,16 @@ namespace Astra.Roles;
             {
                 RemoveRole(ev.Player);
             }
+        }
+
+        /// <summary>角色模板被框架登记后调用；默认空实现，可覆写做模板级初始化。</summary>
+        public virtual void OnRegisterEvents()
+        {
+        }
+
+        /// <summary>角色模板从框架注销前调用；默认空实现，可覆写清理模板级资源。</summary>
+        public virtual void OnUnregisterEvents()
+        {
         }
 
         public virtual CustomRole CreateInstance() => (CustomRole)Activator.CreateInstance(GetType());

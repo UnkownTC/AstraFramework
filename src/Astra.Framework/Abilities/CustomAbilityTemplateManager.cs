@@ -112,5 +112,12 @@ namespace Astra.Abilities;
             ability = ability1 as T;
             return flag && ability is not null;
         }
+
+        /// <summary>清空模板注册表（框架卸载时调用）；模板的事件注销与注销回调由 <c>EventManager</c> 负责。</summary>
+        internal static void Clear()
+        {
+            RegisteredAbilities.Clear();
+            AbilitiesByType.Clear();
+        }
     }
 

@@ -68,6 +68,7 @@ internal static class CustomItemManager
                 {
                     LabApi.Features.Console.Logger.Warn(
                         $"[CustomItemManager] 物品 Id 重复：{item.Id}（{sameId.GetType().Name} 已被 {type.Name} 覆盖）。");
+                    NotifyUnregister(sameId);
                 }
 
                 if (ByItemType.TryGetValue(item.BaseItem, out var sameBase))
@@ -82,6 +83,7 @@ internal static class CustomItemManager
                 }
 
                 Registry[item.Id] = item;
+                NotifyRegister(item);
             }
             catch (Exception ex)
             {
@@ -146,10 +148,41 @@ internal static class CustomItemManager
     /// <summary>清空模板、实例与追踪表（框架卸载时调用）。</summary>
     internal static void Clear()
     {
+        foreach (var item in Registry.Values)
+            NotifyUnregister(item);
+
         Templates.Clear();
         Registry.Clear();
         ByItemType.Clear();
         Tracked.Clear();
         ShootingOverrideCache.Clear();
+    }
+
+    /// <summary>调用定义的登记回调；回调异常只记日志。</summary>
+    /// <param name="item">已登记的物品定义。</param>
+    private static void NotifyRegister(CustomItem item)
+    {
+        try
+        {
+            item.OnRegisterEvents();
+        }
+        catch (Exception ex)
+        {
+            LabApi.Features.Console.Logger.Error($"[CustomItemManager] 物品 {item.Id} 登记回调异常：{ex.Message}");
+        }
+    }
+
+    /// <summary>调用定义的注销回调；回调异常只记日志。</summary>
+    /// <param name="item">待注销的物品定义。</param>
+    private static void NotifyUnregister(CustomItem item)
+    {
+        try
+        {
+            item.OnUnregisterEvents();
+        }
+        catch (Exception ex)
+        {
+            LabApi.Features.Console.Logger.Error($"[CustomItemManager] 物品 {item.Id} 注销回调异常：{ex.Message}");
+        }
     }
 }

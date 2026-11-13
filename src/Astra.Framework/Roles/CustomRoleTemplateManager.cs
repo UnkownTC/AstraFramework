@@ -53,4 +53,11 @@ internal sealed class CustomRoleTemplateManager
         role = role1 as T;
         return flag && role is not null;
     }
+
+    /// <summary>清空模板注册表（框架卸载时调用）；模板的事件注销与注销回调由 <c>EventManager</c> 负责。</summary>
+    internal static void Clear()
+    {
+        RegisteredRoles.Clear();
+        RolesByType.Clear();
+    }
 }

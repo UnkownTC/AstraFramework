@@ -46,10 +46,20 @@ namespace Astra.Events;
             if (handler is null || type is null)
                 return;
 
-            if (handler is CustomAbility or CustomRole)
+            if (handler is ICustomContent)
             {
                 CustomHandlersManager.RegisterEvents(handler, type);
                 _instanceHandlers.Add(handler);
+
+                // 先纳入管理再回调：回调抛异常也不能让模板脱离框架的注销链路。
+                if (handler is ICallOnRegister registerTrigger)
+                {
+                    try
+                    { registerTrigger.OnRegisterEvents(); }
+                    catch (Exception ex)
+                    { Logger.Error($"[EventManager] {type.FullName} 登记回调异常：{ex.Message}"); }
+                }
+
                 return;
             }
 
@@ -79,6 +89,14 @@ namespace Astra.Events;
                 try
                 { CustomHandlersManager.UnregisterEventsHandler(handler); }
                 catch (Exception ex) { Logger.Error($"[EventManager] 模板实例 {handler.GetType().FullName} 注销失败：{ex.Message}"); }
+
+                // 与注册侧对称：即使 LabAPI 注销失败也要给出清理机会。
+                if (handler is ICallOnUnregister unregisterTrigger)
+                {
+                    try
+                    { unregisterTrigger.OnUnregisterEvents(); }
+                    catch (Exception ex) { Logger.Error($"[EventManager] 模板实例 {handler.GetType().FullName} 注销回调异常：{ex.Message}"); }
+                }
             }
             _instanceHandlers.Clear();
         }

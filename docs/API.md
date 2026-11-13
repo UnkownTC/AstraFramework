@@ -74,7 +74,7 @@
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 90 个（class 62 / enum 8 / interface 16 / struct 4），命名空间 19 个；公开成员 612 个。
+- **统计**：公开类型 90 个（class 62 / enum 8 / interface 16 / struct 4），命名空间 19 个；公开成员 622 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -180,7 +180,7 @@
 
 #### `CustomAbility`
 
-`public abstract class CustomAbility : CustomEventsHandler, IIdentifiable`
+`public abstract class CustomAbility : CustomEventsHandler, ICustomContent, ICallOnRegister, ICallOnUnregister`
 
 源码：`src/Astra.Framework/Abilities/CustomAbility.cs`
 
@@ -197,6 +197,8 @@
 - `protected virtual void OnTriggered(Player player)` — 技能被触发时调用。
 - `public override bool Equals(object obj)`
 - `public override int GetHashCode()`
+- `public virtual void OnRegisterEvents()` — 技能模板被框架登记后调用；默认空实现，可覆写做模板级初始化。
+- `public virtual void OnUnregisterEvents()` — 技能模板从框架注销前调用；默认空实现，可覆写清理模板级资源。
 - `public virtual CustomAbility CreateInstance()` — 基于当前模板创建一个技能实例。默认使用反射无参构造，可覆写以自定义实例化逻辑。
 
 #### `CustomAbilityApi`
@@ -1032,7 +1034,7 @@
 
 #### `CustomItem`
 
-`public abstract class CustomItem : IIdentifiable`
+`public abstract class CustomItem : ICustomContent, ICallOnRegister, ICallOnUnregister`
 
 源码：`src/Astra.Framework/Items/CustomItem.cs`
 
@@ -1054,6 +1056,8 @@
 - `public virtual bool OnThrowing(Player player, Pickup pickup)` — 物品被投掷前调用；返回 false 阻止本次投掷。
 - `public virtual Item? Give(Player player)` — 给玩家发放本物品。
 - `protected virtual Item? CreateItem(Player player)` — 创建待发放的物品实例；默认发放 BaseItem。
+- `public virtual void OnRegisterEvents()` — 物品定义被框架登记后调用；默认空实现，可覆写做定义级初始化。
+- `public virtual void OnUnregisterEvents()` — 物品定义从框架注销前调用；默认空实现，可覆写清理定义级资源。
 
 #### `CustomItemApi`
 
@@ -1154,7 +1158,7 @@
 
 源码：`src/Astra.Framework/Loader/ICallOnRegister.cs`
 
-> 表示组件在被注册为事件处理器时需要执行一次初始化回调。
+> 表示组件在被框架登记时执行一次初始化回调。
 
 - `void OnRegisterEvents()` — 在组件被注册到事件系统时调用。
 
@@ -1164,7 +1168,7 @@
 
 源码：`src/Astra.Framework/Loader/ICallOnUnregister.cs`
 
-> 表示组件在被注销事件处理器时需要执行一次清理回调。
+> 表示组件在被框架注销时执行一次清理回调。
 
 - `void OnUnregisterEvents()` — 在组件从事件系统注销时调用。
 
@@ -1239,7 +1243,7 @@
 
 #### `CustomRole`
 
-`public abstract class CustomRole : CustomEventsHandler, ICustomContent, IOriginalRole`
+`public abstract class CustomRole : CustomEventsHandler, ICustomContent, IOriginalRole, ICallOnRegister, ICallOnUnregister`
 
 源码：`src/Astra.Framework/Roles/CustomRole.cs`
 
@@ -1263,6 +1267,8 @@
 - `protected virtual void OnAdded(Player player)`
 - `protected virtual void OnRemoved(Player player)`
 - `public override void OnPlayerChangingRole(PlayerChangingRoleEventArgs ev)` — 角色变更前收口。
+- `public virtual void OnRegisterEvents()` — 角色模板被框架登记后调用；默认空实现，可覆写做模板级初始化。
+- `public virtual void OnUnregisterEvents()` — 角色模板从框架注销前调用；默认空实现，可覆写清理模板级资源。
 - `public virtual CustomRole CreateInstance()`
 
 #### `CustomRoleApi`
@@ -1335,7 +1341,7 @@
 
 #### `CustomTeam`
 
-`public abstract class CustomTeam : IEquatable<CustomTeam>, IIdentifiable`
+`public abstract class CustomTeam : IEquatable<CustomTeam>, ICustomContent, ICallOnRegister, ICallOnUnregister`
 
 源码：`src/Astra.Framework/Teams/CustomTeam.cs`
 
@@ -1355,6 +1361,8 @@
 - `public bool? TryGetExplicitRelation(CustomTeam? other, Team otherVanillaTeam, RoleTypeId? otherRole = null)` — 取得本阵营对目标的明确态度；未明确声明时返回 null。
 - `protected virtual bool IsVanillaEnemy(Team otherTeam)` — 判断本阵营与原版阵营的关系（仅 KeepVanillaRelate 为 true 时使用）。
 - `protected virtual bool IsCustomEnemy(CustomTeam other)` — 判断两个自定义阵营在「原版关系」下的敌友（仅 KeepVanillaRelate 为 true 时使用）。
+- `public virtual void OnRegisterEvents()` — 阵营实例被框架登记后调用；默认空实现，可覆写做实例级初始化。
+- `public virtual void OnUnregisterEvents()` — 阵营实例从框架注销前调用；默认空实现，可覆写清理实例级资源。
 - `public bool Equals(CustomTeam? other)`
 - `public override bool Equals(object? obj)`
 - `public override int GetHashCode()`
@@ -1471,7 +1479,7 @@
 
 #### `CustomWave`
 
-`public abstract class CustomWave : IIdentifiable`
+`public abstract class CustomWave : ICustomContent, ICallOnRegister, ICallOnUnregister`
 
 源码：`src/Astra.Framework/Waves/CustomWave.cs`
 
@@ -1495,6 +1503,8 @@
 - `public virtual bool CheckAllowSpawn(Player player)` — 判断玩家是否允许被本波次刷新。
 - `protected virtual void OnWavePlayerSpawned(Player player)` — 单个玩家生成完成后的钩子。
 - `protected virtual void OnWaveSpawned(IReadOnlyList<Player> players)` — 全部玩家生成完成后的钩子。
+- `public virtual void OnRegisterEvents()` — 波次实例被框架登记后调用；默认空实现，可覆写做实例级初始化。
+- `public virtual void OnUnregisterEvents()` — 波次实例从框架注销前调用；默认空实现，可覆写清理实例级资源。
 
 #### `CustomWaveApi`
 
