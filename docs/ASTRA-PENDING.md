@@ -89,7 +89,7 @@ if (patchMethod.GetCustomAttributes<PatchMethodAttribute>().Any())
 
 ## 4. 与 PluginContent 迁移的衔接
 
-以下三项不在本清单（不是缺陷，是新增能力），进度见 `MIGRATION-PLUGINCONTENT.md`：
+以下两项不在本清单（不是缺陷，是新增能力），进度见 `MIGRATION-PLUGINCONTENT.md`：
 
 | 能力 | 状态 |
 |---|---|
