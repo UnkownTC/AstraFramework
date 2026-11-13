@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `3.0.1`（`Directory.Build.props`） |
+| 适用版本 | `3.1.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -74,9 +74,9 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 | --- | --- | --- | --- |
 | 自定义角色 | `CustomRole`；要技能 / 护盾 / 效果时用 `StandardRole` | 套用 `CustomRoleApi.AddRole<T>(player)` 或 `AddRole(player, id)`；查询 `GetRole` / `TryGetRole`；移除 `RemoveRole` | `Id` 全局唯一。事件回调跑在模板实例上，判断「该玩家是否正持有同类角色」用 `Check(player)`，不要比 `Owner`（模板恒为 `null`）。阵营归属读 `Team`（`TeamRef`）；初始物品 `Items` 用 `ItemEntry`（原版 ItemType / 自定义物品 Id，自定义物品会走 `Give`） |
 | 自定义阵营 | `CustomTeam` | 查询 `CustomTeamApi.Teams` / `Find` / `Find<T>` | 一次性实例化、跨回合复用，可直接持有实例引用 |
-| 自定义波次 | `CustomWave`（`Id` / `Name` / `Teams`：`IReadOnlyList<TeamRef>`）；角色侧实现 `IWaveSpawnRole` 声明归属与默认数量，波次可用 `Spawns`（`WaveSpawnEntry`）额外声明 / 覆盖刷新项 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`SetRoleSpawner`）或 `ICustomWaveRoleSpawnerV2`（`AddRoleSpawner`）；执行 `CustomWaveApi.Spawn` | `Roles` / `Table` 用 `RoleEntry`（原版 + 自定义可混编）；角色可用 `IWaveSpawnCountProvider` 按波次声明数量；主阵营读 `Team`（`TeamRef`）；无生成器时原版角色由框架直接套用、自定义角色会失败 |
+| 自定义波次 | `CustomWave`（`Id` / `Name` / `Teams`：`IReadOnlyList<TeamRef>`）；角色侧实现 `IWaveSpawnRole` 声明归属与默认数量，波次可用 `Spawns`（`WaveSpawnEntry`）额外声明 / 覆盖刷新项 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`SetRoleSpawner`）或 `ICustomWaveRoleSpawnerV2`（`AddRoleSpawner`）；执行 `CustomWaveApi.Spawn`；加权调度用 `WaveScheduler` | `Roles` / `Table` 用 `RoleEntry`（原版 + 自定义可混编）；角色可用 `IWaveSpawnCountProvider` 按波次声明数量；波次实现 `IWeightedWave` 后 `WaveScheduler.Load/Advance` 按权重与人数门槛推进；主阵营读 `Team`（`TeamRef`）；无生成器时原版角色由框架直接套用、自定义角色会失败 |
 | 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火；装备 / 拾取 / 使用 / 投掷 / 换弹 / 瞄准 / 命中均有可覆写钩子 |
-| 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明 |
+| 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明；`CanStack = true` 时同类效果经 `CustomEffectController.AddEffect` 叠加层数（强度 ×层数、时长累加） |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
 | 休谟护盾 | `ICustomHumeShieldStat`（`StandardRole` 已实现） | 随角色套用自动接管生灭 | `HumeShieldCurve` 非空时以曲线为准 |
 | 事件处理 | `CustomEventsHandler`；需要射击扩展事件时用 `EnhancedEventsHandler` | 自动注册（见 §1.3）；状态与启停用 `EventApi` | 角色 / 技能的事件在模板实例上回调；`[EventMethod]` 的方法可标注多个、订阅多个签名一致的事件，重复声明同一事件会自动去重（只触发一次） |
@@ -105,7 +105,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 100 个（class 67 / enum 8 / interface 18 / struct 7），命名空间 20 个；公开成员 684 个。
+- **统计**：公开类型 103 个（class 69 / enum 8 / interface 19 / struct 7），命名空间 20 个；公开成员 697 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -131,7 +131,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 | `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`RoleEntry`、`StandardRole` |
 | `Astra.ServerSpecificSettings` | `ServerSpecificSettingBase`、`ServerSpecificSettingManager` |
 | `Astra.Teams` | `CustomTeam`、`CustomTeamApi`、`CustomTeamRelation`、`CustomTeamResolver`、`RelationEntry`、`RelationEntryKind`、`TeamRef` |
-| `Astra.Waves` | `CustomWave`、`CustomWaveApi`、`DelegatedWaveSorter<T>`、`ICustomWaveRoleSpawner`、`ICustomWaveRoleSpawnerV2`、`IWaveSorter<in T>`、`IWaveSpawnCountProvider`、`IWaveSpawnRole`、`WaveComposition`、`WaveSorterExtensions`、`WaveSpawnEntry` |
+| `Astra.Waves` | `CustomWave`、`CustomWaveApi`、`DelegatedWaveSorter<T>`、`ICustomWaveRoleSpawner`、`ICustomWaveRoleSpawnerV2`、`IWaveSorter<in T>`、`IWaveSpawnCountProvider`、`IWaveSpawnRole`、`IWeightedWave`、`WaveComposition`、`WaveScheduler`、`WaveSorterExtensions`、`WaveSpawnEntry`、`WeightedWaveAdapter` |
 
 ---
 
@@ -605,6 +605,8 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public float TimeLeft { get; private set; }`
 - `public virtual byte MaxIntensity { get; }`
 - `public virtual bool AllowEnabling { get; }`
+- `public virtual bool CanStack { get; }` — 是否允许同类效果叠加层数；默认 false，保持原有行为。
+- `public int StackCount { get; private set; }` — 当前叠加层数；未叠加时为 1，禁用时重置为 1。
 - `public bool IsEnabled { get; }`
 - `public void SetState(byte intensity, float duration = 0f, bool addDuration = false)`
 - `public void ForceIntensity(byte value)`
@@ -1749,6 +1751,18 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `IReadOnlyList<CustomWave> Waves { get; }` — 归属的波次实例列表。
 - `int WaveSpawnCount { get; }` — 在每个归属波次中的刷新数量；-1 表示填充剩余玩家。
 
+#### `IWeightedWave`
+
+`public interface IWeightedWave`
+
+源码：`src/Astra.Framework/Waves/IWeightedWave.cs`
+
+> 波次的权重与人数门槛：供 WeightedWaveAdapter 与 WaveScheduler 使用。
+
+- `int Weight { get; }` — 权重；越大越优先。
+- `int MinPlayers { get; }` — 触发所需最少存活人数；<= 0 表示不限。
+- `int MaxPlayers { get; }` — 触发允许的最大存活人数；< 0 表示不限。
+
 #### `WaveComposition`
 
 `public sealed class WaveComposition`
@@ -1759,6 +1773,21 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 - `public void Add(string roleId, int count)` — 累加一个角色的刷新数量。
 - `public IReadOnlyDictionary<string, int> ToTable()` — 导出为只读字典。
+
+#### `WaveScheduler`
+
+`public sealed class WaveScheduler`
+
+源码：`src/Astra.Framework/Waves/WaveScheduler.cs`
+
+> 加权波次调度器：只决定「顺序 + 是否跳过」，实际生成仍由 Spawn 执行。
+
+- `public WaveScheduler(Func<int>? playerCountProvider = null)` — 构造调度器。
+- `public CustomWave? Current { get; private set; }` — 当前波次；Advance 成功推进后更新，队列耗尽时为 null。
+- `public int Remaining { get; }` — 尚未推进的波次数量。
+- `public int Load(IEnumerable<CustomWave> waves)` — 覆盖式装载波次，按权重排序并重置游标。
+- `public CustomWave? Advance(int? playerCount = null)` — 推进到下一个满足人数门槛的波次。
+- `public void Reset()` — 清空队列与当前波次。
 
 #### `WaveSorterExtensions`
 
@@ -1784,5 +1813,16 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public static WaveSpawnEntry Custom(CustomRole role, int count)` — 用自定义角色实例创建条目。
 - `public static WaveSpawnEntry Custom(string roleId, int count)` — 用自定义角色 Id 创建条目。
 - `public static WaveSpawnEntry Vanilla(RoleTypeId role, int count)` — 用原版角色创建条目。
+
+#### `WeightedWaveAdapter`
+
+`public sealed class WeightedWaveAdapter : IWaveSorter<CustomWave>`
+
+源码：`src/Astra.Framework/Waves/WeightedWaveAdapter.cs`
+
+> 把 IWeightedWave 的权重转换为 IWaveSorter{T} 的排序器。
+
+- `public static readonly WeightedWaveAdapter Instance`
+- `public int Compare(CustomWave left, CustomWave right)`
 
 <!-- AUTO-GEN:END -->

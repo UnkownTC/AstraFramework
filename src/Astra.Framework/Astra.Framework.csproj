@@ -223,7 +223,10 @@
     <Compile Include="Waves\IWaveSorter.cs" />
     <Compile Include="Waves\IWaveSpawnCountProvider.cs" />
     <Compile Include="Waves\IWaveSpawnRole.cs" />
+    <Compile Include="Waves\IWeightedWave.cs" />
+    <Compile Include="Waves\WaveScheduler.cs" />
     <Compile Include="Waves\WaveSpawnEntry.cs" />
+    <Compile Include="Waves\WeightedWaveAdapter.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

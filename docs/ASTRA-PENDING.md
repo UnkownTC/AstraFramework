@@ -37,11 +37,11 @@
 ## 4. 待建能力（PluginContent 迁移前置）
 
 以下两项不是缺陷，是 Astra 目前缺失的能力；补齐后 PluginContent 才能脱离 FirearmPack。
-**（代码已于 2026-11-14 试跑验证可编译，但按要求回滚，仅保留本规格。）**
+**（已于 2026-11-14 在 3.1.0 实现并提交；验收状态见 §5。）**
 
 ---
 
-### 4.1 加权波次与调度器
+### 4.1 加权波次与调度器（已实现，3.1.0）
 
 **新增文件**：`Waves/IWeightedWave.cs`、`Waves/WeightedWaveAdapter.cs`、`Waves/WaveScheduler.cs`
 **复用既有**：`IWaveSorter<in T>`、`DelegatedWaveSorter<T>.Sort()`（已存在，不重复造排序器）
@@ -84,7 +84,7 @@ public interface IWeightedWave
 
 ---
 
-### 4.2 效果叠加
+### 4.2 效果叠加（已实现，3.1.0）
 
 **修改文件**：`Effects/CustomEffect.cs`、`Effects/CustomEffectController.cs`
 
@@ -147,7 +147,7 @@ public void AddEffect(CustomEffect effect)
 | 修改公开类型 | `CustomEffect`（+2 成员）、`CustomEffectController`（行为分支） |
 | 兼容性 | 非破坏性：`CanStack` 默认 false、`Weight` 接口可选实现 |
 | 验证 | Astra 独立编译 0 error；`WaveScheduler` 单测覆盖「权重排序 / 人数跳过 / 队列耗尽」 |
-| 版本 | MINOR（2.x/3.x 内新增能力） |
+| 版本 | MINOR（3.0.1 → 3.1.0） |
 
 ---
 
@@ -157,7 +157,7 @@ public void AddEffect(CustomEffect effect)
 |---|---|---|
 | 1 | §1 各项完成，Astra 独立编译 0 error | 已完成（3.0.1） |
 | 2 | 异常日志能打出完整链路 | 已完成 |
-| 3 | 一个方法可标注多个 `[PatchMethod]` 并全部生效 |
-| 4 | §4.1 加权波次可排序并跳过人数不足的波次 |
-| 5 | §4.2 可叠加效果层数与强度按规格变化 | 已完成 |
-| 4 | 版本号升 PATCH | 已完成（3.0.0 → 3.0.1；原计划 2.2.2 因基线已到 3.0.0 顺延） |
+| 3 | 一个方法可标注多个 `[PatchMethod]` 并全部生效 | 已完成（3.0.1） |
+| 4 | §4.1 加权波次可排序并跳过人数不足的波次 | 已完成（3.1.0） |
+| 5 | §4.2 可叠加效果层数与强度按规格变化 | 已完成（3.1.0） |
+| 6 | 版本号升级（新增能力） | 已完成（3.0.0 → 3.0.1 缺陷修复；3.0.1 → 3.1.0 新增能力） |

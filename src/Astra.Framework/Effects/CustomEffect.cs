@@ -11,6 +11,12 @@ namespace Astra.Effects;
         public float TimeLeft { get; private set; }
         public virtual byte MaxIntensity => byte.MaxValue;
         public virtual bool AllowEnabling => true;
+
+        /// <summary>是否允许同类效果叠加层数；默认 <see langword="false"/>，保持原有行为。</summary>
+        public virtual bool CanStack => false;
+
+        /// <summary>当前叠加层数；未叠加时为 1，禁用时重置为 1。</summary>
+        public int StackCount { get; private set; } = 1;
         public bool IsEnabled => Intensity > 0;
         public CustomEffect(Player player)
         {
@@ -71,7 +77,17 @@ namespace Astra.Effects;
         public void DisableEffect()
         {
             Duration = 0f;
+            StackCount = 1;
             ForceIntensity(0);
+        }
+
+        /// <summary>叠加一层：层数 +1，强度按层数放大（不超过上限），时长累加。</summary>
+        /// <param name="duration">本次叠加的时长；<c>0</c> 表示沿用无时长语义。</param>
+        internal void Stack(float duration)
+        {
+            StackCount++;
+            var scaled = (byte)Mathf.Min((int)Intensity * StackCount, (int)MaxIntensity);
+            SetState(scaled, duration, addDuration: true);
         }
         public virtual void OnInitialize() { }
         public virtual void OnDestroy() { }

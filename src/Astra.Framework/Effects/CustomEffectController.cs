@@ -43,10 +43,20 @@ namespace Astra.Effects;
 
         /// <summary>向控制器追加一个效果实例（已存在则忽略）。</summary>
         /// <param name="effect">效果实例。</param>
+        /// <remarks>
+        /// 同类效果且 <see cref="CustomEffect.CanStack"/> 为 <see langword="true"/> 时，不追加新实例，
+        /// 而是给已有实例叠加层数、抬强度并累加时长。
+        /// </remarks>
         public void AddEffect(CustomEffect effect)
         {
             if (effect is null || _effects.Contains(effect))
                 return;
+
+            if (effect.CanStack && GetEffect(effect.GetType()) is { } existing)
+            {
+                existing.Stack(effect.Duration);
+                return;
+            }
 
             _effects.Add(effect);
         }
