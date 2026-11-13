@@ -76,15 +76,15 @@ namespace Astra.Patching;
         /// <returns>成功应用返回 <see langword="true"/>。</returns>
         internal static bool PatchMethod(MethodInfo patchMethod, Harmony harmony)
         {
-            var attr = patchMethod.GetCustomAttribute<PatchMethodAttribute>();
-            if (attr is null)
+            var attributes = patchMethod.GetCustomAttributes<PatchMethodAttribute>().ToArray();
+            if (attributes.Length == 0)
                 return false;
 
-            var id = $"{patchMethod.DeclaringType?.FullName ?? patchMethod.DeclaringType?.Name}.{patchMethod.Name}";
+            var methodId = $"{patchMethod.DeclaringType?.FullName ?? patchMethod.DeclaringType?.Name}.{patchMethod.Name}";
 
             if (!patchMethod.IsStatic)
             {
-                Logger.Error($"[PatchManager] 方法补丁 {id} 必须是静态方法，已拒绝。");
+                Logger.Error($"[PatchManager] 方法补丁 {methodId} 必须是静态方法，已拒绝。");
                 return false;
             }
 
@@ -93,19 +93,6 @@ namespace Astra.Patching;
                     AstraPlugin.Configuration.IgnorePatchGameMajorVersionDiff))
                 return false;
 
-            if (_methodPatches.ContainsKey(id))
-            {
-                Logger.Error($"[PatchManager] 方法补丁 {id} 已存在。");
-                return false;
-            }
-
-            var target = attr.Target;
-            if (target is null)
-            {
-                Logger.Error($"[PatchManager] 方法补丁 {id} 的目标 {attr.TargetType.Name}.{attr.TargetMethodName} 未找到，已拒绝。");
-                return false;
-            }
-
             var prefix = patchMethod.GetCustomAttribute<HarmonyPrefix>() is null ? null : new HarmonyMethod(patchMethod);
             var postfix = patchMethod.GetCustomAttribute<HarmonyPostfix>() is null ? null : new HarmonyMethod(patchMethod);
             var transpiler = patchMethod.GetCustomAttribute<HarmonyTranspiler>() is null ? null : new HarmonyMethod(patchMethod);
@@ -113,23 +100,45 @@ namespace Astra.Patching;
 
             if (prefix is null && postfix is null && transpiler is null && finalizer is null)
             {
-                Logger.Error($"[PatchManager] 方法补丁 {id} 未标注 HarmonyPrefix/Postfix/Transpiler/Finalizer，已拒绝。");
+                Logger.Error($"[PatchManager] 方法补丁 {methodId} 未标注 HarmonyPrefix/Postfix/Transpiler/Finalizer，已拒绝。");
                 return false;
             }
 
-            try
+            var applied = false;
+
+            // 一个方法可标注多个 [PatchMethod]（AllowMultiple），逐个目标单独应用与登记。
+            foreach (var attr in attributes)
             {
-                harmony.Patch(target, prefix, postfix, transpiler, finalizer);
-                _methodPatches[id] = new MethodPatchEntry(harmony, target, patchMethod);
-                if (DebugEnabled)
-                    Logger.Info($"[PatchManager] 方法补丁 {id} 已启用 → {target.DeclaringType?.Name}.{target.Name}");
-                return true;
+                var target = attr.Target;
+                var id = $"{methodId} → {attr.TargetType.Name}.{attr.TargetMethodName ?? ".ctor"}";
+
+                if (target is null)
+                {
+                    Logger.Error($"[PatchManager] 方法补丁 {id} 的目标未找到，已拒绝。");
+                    continue;
+                }
+
+                if (_methodPatches.ContainsKey(id))
+                {
+                    Logger.Error($"[PatchManager] 方法补丁 {id} 已存在。");
+                    continue;
+                }
+
+                try
+                {
+                    harmony.Patch(target, prefix, postfix, transpiler, finalizer);
+                    _methodPatches[id] = new MethodPatchEntry(harmony, target, patchMethod);
+                    applied = true;
+                    if (DebugEnabled)
+                        Logger.Info($"[PatchManager] 方法补丁 {id} 已启用 → {target.DeclaringType?.Name}.{target.Name}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"[PatchManager] 方法补丁 {id} 启用失败：{ex}");
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error($"[PatchManager] 方法补丁 {id} 启用失败：{ex}");
-                return false;
-            }
+
+            return applied;
         }
 
         /// <summary>按完整类型名或唯一短类名查询补丁；匹配不区分大小写。</summary>

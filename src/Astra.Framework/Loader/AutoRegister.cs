@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 
 using Astra.Abilities;
 using Astra.Attributes;
@@ -54,7 +55,7 @@ namespace Astra
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"[AutoRegister] 无法枚举程序集 {assembly.FullName} 中的类型，已跳过。Exception: {ex.Message}");
+                    Logger.Error($"[AutoRegister] 无法枚举程序集 {assembly.FullName} 中的类型，已跳过。{DescribeException(ex)}");
                 }
             }
 
@@ -73,7 +74,7 @@ namespace Astra
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"[AutoRegister] 注册类型 {type.FullName} 时发生异常，已跳过。Exception: {ex.Message}");
+                    Logger.Error($"[AutoRegister] 注册类型 {type.FullName} 时发生异常，已跳过。{DescribeException(ex)}");
                     Logger.Error(ex.StackTrace);
                 }
             }
@@ -102,7 +103,7 @@ namespace Astra
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"[AutoRegister] 注册角色 {type.FullName} 时发生异常，已跳过。Exception: {ex.Message}");
+                    Logger.Error($"[AutoRegister] 注册角色 {type.FullName} 时发生异常，已跳过。{DescribeException(ex)}");
                 }
             }
 
@@ -172,16 +173,17 @@ namespace Astra
             }
 
             if (type.GetCustomAttribute<ManagedPatchAttribute>() is not null &&
-                (type.GetCustomAttribute<HarmonyPatch>() is not null || typeof(IManualPatch).IsAssignableFrom(type)))
+                (type.IsDefined(typeof(HarmonyPatch), false) || typeof(IManualPatch).IsAssignableFrom(type)))
             {
                 PatchManager.PatchType(type, HarmonyInstance);
             }
 
             // 方法级补丁：无需外层类标 [ManagedPatch]，由方法上的 [ManagedPatchMethod] 自带目标信息。
+            // 用 IsDefined 而不是单数 GetCustomAttribute：一个方法允许标注多个 [PatchMethod]。
             foreach (var patchMethod in type.GetMethods(
                          BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
             {
-                if (patchMethod.GetCustomAttribute<PatchMethodAttribute>() is not null)
+                if (patchMethod.IsDefined(typeof(PatchMethodAttribute), false))
                     PatchManager.PatchMethod(patchMethod, HarmonyInstance);
             }
 
@@ -217,6 +219,23 @@ namespace Astra
             CustomTeam.Clear();
             CustomRoleTemplateManager.Clear();
             CustomAbilityTemplateManager.Clear();
+        }
+
+        /// <summary>展开异常链，避免 TargetInvocationException 把真实原因藏在内层。</summary>
+        /// <param name="ex">捕获到的异常。</param>
+        /// <returns>形如「外层类型: 消息 → 内层类型: 消息」的描述。</returns>
+        private static string DescribeException(Exception ex)
+        {
+            var builder = new StringBuilder();
+            for (var current = ex; current is not null; current = current.InnerException)
+            {
+                if (builder.Length > 0)
+                    builder.Append(" → ");
+
+                builder.Append(current.GetType().Name).Append(": ").Append(current.Message);
+            }
+
+            return builder.ToString();
         }
     }
 }
