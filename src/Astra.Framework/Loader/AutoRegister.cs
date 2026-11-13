@@ -173,7 +173,7 @@ namespace Astra
             }
 
             if (type.GetCustomAttribute<ManagedPatchAttribute>() is not null &&
-                (type.IsDefined(typeof(HarmonyPatch), false) || typeof(IManualPatch).IsAssignableFrom(type)))
+                (type.IsDefined(typeof(HarmonyPatch), inherit: true) || typeof(IManualPatch).IsAssignableFrom(type)))
             {
                 PatchManager.PatchType(type, HarmonyInstance);
             }

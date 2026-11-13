@@ -1,70 +1,13 @@
-# Astra 待补清单（截至 2026-11-14，基线 3.0.0）
+# Astra 待补清单（截至 2026-11-14，基线 3.0.1）
 
 > 本文件只列**当前仍然缺的**。已修项在 §3 留档，避免重复劳动。
 > 与 PluginContent 迁移相关的其余能力见 `MIGRATION-PLUGINCONTENT.md`。
 
 ---
 
-## 1. 待修（缺陷类，2 项）
+## 1. 待修（缺陷类）
 
-### 1.1 `Loader/AutoRegister.cs` — 异常链不可见
-
-| 项 | 内容 |
-|---|---|
-| 位置 | `Loader/AutoRegister.cs` 第 **57 / 76 / 105** 行 |
-| 现状 | `Logger.Error($"... Exception: {ex.Message}")` |
-| 问题 | `Activator.CreateInstance` 抛的是 `TargetInvocationException`，`Message` 恒为「Exception has been thrown by the target of an invocation.」，真实原因在 `InnerException` 里，被丢弃 |
-| 影响 | 类型注册失败时日志无信息量，排障只能靠猜 |
-
-**改法**：新增展开辅函数，三处日志统一替换。
-
-```csharp
-/// <summary>展开异常链，避免 TargetInvocationException 把真实原因藏在内层。</summary>
-private static string DescribeException(Exception ex)
-{
-    var builder = new StringBuilder();
-    for (var current = ex; current is not null; current = current.InnerException)
-    {
-        if (builder.Length > 0)
-            builder.Append(" → ");
-
-        builder.Append(current.GetType().Name).Append(": ").Append(current.Message);
-    }
-
-    return builder.ToString();
-}
-```
-
-```csharp
-// 替换前
-Logger.Error($"[AutoRegister] 注册类型 {type.FullName} 时发生异常，已跳过。Exception: {ex.Message}");
-
-// 替换后
-Logger.Error($"[AutoRegister] 注册类型 {type.FullName} 时发生异常，已跳过。{DescribeException(ex)}");
-```
-
-涉及三处：程序集枚举失败（57）、类型注册失败（76）、角色注册失败（105）。
-
-**验收**：构造一个构造函数据抛异常的类型，日志包含「外层类型 → 内层类型」两段。
-
----
-
-### 1.2 `Loader/AutoRegister.cs` 第 184 行 — 单数特性查询
-
-| 项 | 内容 |
-|---|---|
-| 位置 | `Loader/AutoRegister.cs:184` |
-| 现状 | `if (patchMethod.GetCustomAttribute<PatchMethodAttribute>() is not null)` |
-| 问题 | `PatchMethodAttribute` 声明为 `AllowMultiple = true`（`Attributes/PatchMethodAttribute.cs:28`），同一方法标注两个 `[PatchMethod]` 时单数 API 抛 `AmbiguousMatchException` |
-| 影响 | 与 Site19 侧已修的坑同源；目前只是没人标两个，属**潜在缺陷** |
-
-**改法**：
-
-```csharp
-if (patchMethod.GetCustomAttributes<PatchMethodAttribute>().Any())
-```
-
-**验收**：同一方法标注两个 `[PatchMethod]`（不同目标）时，注册流程不抛异常，两个补丁都被登记。
+（无）
 
 ---
 
@@ -75,6 +18,7 @@ if (patchMethod.GetCustomAttributes<PatchMethodAttribute>().Any())
 | `Events/EventMethodManager.cs` | 已用复数 API + 按「事件类型::事件名」去重 + `IsAlreadySubscribed` 防重订阅 |
 | `Loader/VersionGuard.cs:123` | 单数查询用于 `PatchApiVersion` / `PatchGameVersion`，`AllowMultiple` 为默认 `false`，安全 |
 | `Items/CustomItemEventHandler.cs` | 走 `EnhancedEventsHandler` 是 Astra 自有事件总线（`ShotBacktrackDataPatch` → `PlayerEvents.OnShooting`），非缺陷 |
+| `Loader/AutoRegister.cs`（`ManagedPatchAttribute` / `ManagedEventAttribute` / `DisableAutoRegisterAttribute`） | 均为单次标注（`AllowMultiple` 默认 `false`），单数查询安全 |
 
 ---
 
@@ -84,6 +28,9 @@ if (patchMethod.GetCustomAttributes<PatchMethodAttribute>().Any())
 |---|---|---|
 | Mono 特性继承导致 `AmbiguousMatchException` | 复数取值 + 去重键去重 | `Events/EventMethodManager.GetEffectiveAttributes` |
 | 同实例同事件重复订阅 | `IsAlreadySubscribed` 守卫 | `Events/EventMethodManager` |
+| 注册异常被 `TargetInvocationException` 吞掉内层原因 | 新增 `DescribeException` 展开 `InnerException` 链，三处注册日志统一替换 | `Loader/AutoRegister.cs` |
+| 类上多个 `[HarmonyPatch]` 时单数查询歧义 | 改用 `type.IsDefined(typeof(HarmonyPatch), false)` | `Loader/AutoRegister.cs` |
+| 同一方法多个 `[PatchMethod]` 时抛 `AmbiguousMatchException` / 只登记一个目标 | `AutoRegister` 改用 `IsDefined`；`PatchManager.PatchMethod` 遍历全部特性、逐个目标应用与登记（登记键含目标） | `Loader/AutoRegister.cs`、`Patching/PatchManager.cs` |
 
 ---
 
@@ -100,9 +47,9 @@ if (patchMethod.GetCustomAttributes<PatchMethodAttribute>().Any())
 
 ## 5. 完成标准
 
-| # | 标准 |
-|---|---|
-| 1 | §1 两项完成，Astra 独立编译 0 error |
-| 2 | 异常日志能打出完整链路 |
-| 3 | 一个方法可标注多个 `[PatchMethod]` 并全部生效 |
-| 4 | 版本号升 PATCH（2.2.2），提交信息注明两项修复 |
+| # | 标准 | 状态 |
+|---|---|---|
+| 1 | §1 各项完成，Astra 独立编译 0 error | 已完成（3.0.1） |
+| 2 | 异常日志能打出完整链路 | 已完成 |
+| 3 | 一个方法可标注多个 `[PatchMethod]` 并全部生效 | 已完成 |
+| 4 | 版本号升 PATCH | 已完成（3.0.0 → 3.0.1；原计划 2.2.2 因基线已到 3.0.0 顺延） |
