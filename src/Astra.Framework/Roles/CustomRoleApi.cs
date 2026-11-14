@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 
+using Astra.Lifecycle;
+
 using LabApi.Features.Wrappers;
 
 namespace Astra.Roles;
@@ -28,7 +30,32 @@ public static class CustomRoleApi
     /// <param name="template">角色模板实例。</param>
     /// <returns>注册成功或同实例重复注册返回 <see langword="true"/>；Id 冲突等失败返回 <see langword="false"/>。</returns>
     /// <remarks>须在框架自动注册完成之后调用；注册后立即可用于 <see cref="AddRole(Player, string)"/>。</remarks>
-    public static bool Register(CustomRole template) => CustomRoleTemplateManager.RegisterInstance(template);
+    public static bool Register(CustomRole template)
+    {
+        if (template is null || !CustomRoleTemplateManager.RegisterInstance(template))
+            return false;
+
+        RegistrationTracking.Role(template, RegistrationSource.FromType(template.GetType()));
+        return true;
+    }
+
+    /// <summary>在指定注册作用域内按实例注册角色模板。</summary>
+    /// <param name="template">角色模板实例。</param>
+    /// <param name="scope">注册作用域；释放时按作用域来源撤销该角色。</param>
+    /// <returns>注册成功或同实例重复注册返回 <see langword="true"/>；Id 冲突等失败返回 <see langword="false"/>。</returns>
+    public static bool Register(CustomRole template, RegistrationScope scope)
+    {
+        if (template is null)
+            return false;
+        if (scope is null)
+            throw new System.ArgumentNullException(nameof(scope));
+
+        if (!CustomRoleTemplateManager.RegisterInstance(template))
+            return false;
+
+        RegistrationTracking.Role(template, scope.Source);
+        return true;
+    }
 
     /// <summary>按 Id 注销角色模板。</summary>
     /// <param name="id">角色 Id。</param>

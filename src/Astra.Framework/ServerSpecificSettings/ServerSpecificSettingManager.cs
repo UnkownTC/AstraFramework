@@ -56,6 +56,27 @@ namespace Astra.ServerSpecificSettings;
             Logger.Info($"[ServerSpecificSettingManager] {id} 已注销");
         }
 
+        /// <summary>按类型注销设置组（来源作用域撤销用）。</summary>
+        /// <param name="type">设置组类型。</param>
+        /// <returns>确实移除时返回 <see langword="true"/>。</returns>
+        internal static bool Unregister(Type type)
+        {
+            if (type is null)
+                return false;
+
+            foreach (var pair in _settingBases.ToArray())
+            {
+                if (pair.Value.GetType() != type)
+                    continue;
+
+                _settingBases.Remove(pair.Key);
+                Logger.Info($"[ServerSpecificSettingManager] {pair.Key} 已按类型注销");
+                return true;
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// 将所有设置组按优先级排序、按 SettingId 去重后统一下发给客户端。
         /// </summary>

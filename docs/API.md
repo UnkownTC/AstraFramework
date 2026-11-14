@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `3.3.1`（`Directory.Build.props`） |
+| 适用版本 | `3.4.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -21,7 +21,7 @@
 | --- | --- |
 | `Enable()` | 把 `MainManager` 注册为 LabAPI 事件处理器；`Config` 同步到静态访问点 `AstraPlugin.Configuration`，并回写默认配置 |
 | `OnServerPluginsEnabled()` | 全部插件启用后触发一次 `AutoRegister.RegisterAll(PluginLoader.Plugins.Values)`；`Initialized` 保证幂等，单个类型失败只记日志、不中断 |
-| `Disable()` | 注销 `MainManager` 并调用 `AutoRegister.UnregisterAll()`，回收事件、设置、补丁、令牌、事件方法，并清空 Team / Wave / Item 注册表 |
+| `Disable()` | 注销 `MainManager` 并调用 `AutoRegister.UnregisterAll()`，回收事件、设置、补丁、令牌、事件方法，并清空 Team / Wave / Item / Role / Ability 注册表 |
 
 ### 1.2 注册顺序
 
@@ -30,7 +30,7 @@
 1. **Team**：`CustomTeam.Initialize()`
 2. **Wave**：`CustomWaveManager.Initialize()`（需要阵营实例；波次会把自身反向登记到阵营）
 3. **Item**：`CustomItemManager.Initialize()`
-4. **Role**：`CustomRoleTemplateManager.RegisterRole()` + `CustomWaveManager.AttachRole()`（需要波次实例；实现 `IWaveSpawnRole` 的角色在此挂到波次）
+4. **Role**：`CustomRoleTemplateManager.RegisterRole()`（需要波次实例；实现 `IWaveSpawnRole` 的角色在注册实例时挂到波次）
 5. `ServerSpecificSettingManager.SendToAll()` 统一下发服务器专属设置
 
 ### 1.3 判定矩阵
@@ -60,13 +60,35 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 | 角色 | `CustomRoleApi.Register(role)` | `CustomRoleApi.Unregister(id)` |
 | 阵营 | `CustomTeamApi.Register(team)` | `CustomTeamApi.Unregister(id)` |
 | 波次 | `CustomWaveApi.Register(wave)` | `CustomWaveApi.Unregister(id)` |
+| 物品 | `CustomItemApi.Register(item)` | `CustomItemApi.Unregister(id)` |
+| 技能 | `CustomAbilityApi.Register(ability)` | `CustomAbilityApi.Unregister(id)` |
 
 - 必须在 `OnServerPluginsEnabled`（框架自动注册完成）之后调用；阵营 / 波次在初始化前注册会返回 `false`，避免触发实例化早退导致 C# 模板丢失。
 - 同 Id 不同实例会被拒绝（不覆盖）；同实例重复注册幂等。
-- 注册顺序：阵营 → 波次 → 角色；注销顺序相反：角色 → 波次 → 阵营。
-- `Unregister` 只注销模板；玩家身上已套用的角色实例需调用方先 `RemoveRole` 摘除。
+- 注册顺序：阵营 → 波次 → 物品 → 角色；注销顺序相反：角色 → 物品 → 波次 → 阵营。技能无跨域依赖，可随每次注册处理。
+- `Unregister` 只注销模板；玩家身上已套用的角色 / 技能 / 物品实例需调用方自行处理。
 - 波次角色生成器支持链式：`CustomWaveApi.AddRoleSpawner(...)` 按注册顺序依次尝试；`SetRoleSpawner` 仍为「替换全部」。实现 `ICustomWaveRoleSpawnerV2` 可接收原版 + 自定义角色条目（`RoleEntry`），旧接口只处理自定义角色 Id。
 - Entry 化：波次的 `Teams` 用 `TeamRef`、`Roles` / `Table` 用 `RoleEntry`、额外刷新项用 `WaveSpawnEntry`；角色的初始物品 `Items` 用 `ItemEntry`。
+
+### 1.5 按来源撤销（插件生命周期）
+
+`Astra.Lifecycle` 把「经 Astra 登记、且能识别来源」的条目记到台账，用于插件禁用时协作式清理：
+
+```csharp
+// 插件 Enable：创建作用域并保存
+_scope = AstraLifecycle.CreateScope("MyPlugin", typeof(MyPlugin).Assembly);
+CustomRoleApi.Register(role, _scope);
+CustomItemApi.Register(item, _scope);
+
+// 插件 Disable：释放作用域
+_scope.Dispose();
+// 等价：AstraLifecycle.UnregisterSource(typeof(MyPlugin).Assembly);
+```
+
+- 自动注册的条目以 `type.Assembly` 为来源；`AstraLifecycle.UnregisterSource(assembly)` 可撤销某程序集在 Astra 登记的条目。
+- 按注册逆序撤销：角色 / 物品 / 波次 / 阵营，再撤销技能 / 事件方法 / 补丁 / 设置 / 事件；阵营与波次依赖顺序由内容阶段的逆序保证。
+- 只管理 Astra 自己的注册表：插件直接订阅 LabAPI 事件、直接打 Harmony 补丁、直接操作游戏对象，不在此范围。
+- `RegistrationScope.Dispose()` 是协作式的：LabAPI 没有「单个插件禁用」事件，必须由插件在 `Disable()` 中自行调用。
 
 ## 2. 扩展点速查
 
@@ -82,6 +104,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 | 事件处理 | `CustomEventsHandler`；需要射击扩展事件时用 `EnhancedEventsHandler` | 自动注册（见 §1.3）；状态与启停用 `EventApi` | 角色 / 技能的事件在模板实例上回调；`[EventMethod]` 的方法可标注多个、订阅多个签名一致的事件，重复声明同一事件会自动去重（只触发一次） |
 | Harmony 补丁 | 类级 `[ManagedPatch]` + `[HarmonyPatch]` 或 `IManualPatch`；方法级 `[PatchMethod]` | 启停 `PatchApi.Enable` / `Disable`；状态 `PatchApi.TryGetStatus` | 可用 `[PatchApiVersion]` / `[PatchGameVersion]` 做版本门禁，`Config` 里有两个忽略开关 |
 | 提示 / 音频 / 倒计时 | — | `HintApi` / `AudioApi` / `CountdownApi` | 均按字符串 Id 精确控制；音频在回合重启时自动归还播放器到对象池 |
+| 插件生命周期 | — | 注册时传入 `RegistrationScope`，或 `AstraLifecycle.CreateScope(...)`；禁用时 `Dispose` / `AstraLifecycle.UnregisterSource(assembly)` | 只撤销 Astra 登记的内容；直接订阅 LabAPI / 直接 Harmony 不在范围；自动注册条目按 `type.Assembly` 归属 |
 | 取消令牌 | — | `CancellationTokenApi` + `CancellationTokenCategory` | 按类别随玩家加入 / 离开、回合重启统一取消 |
 | 服务器专属设置 | `ServerSpecificSettingBase` | 实现 `IIdentifiable` 即自动登记，启动后统一下发 | 技能按键复用其中的 SSKeybindSetting |
 
@@ -105,7 +128,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 106 个（class 72 / enum 8 / interface 19 / struct 7），命名空间 20 个；公开成员 711 个。
+- **统计**：公开类型 109 个（class 74 / enum 8 / interface 19 / struct 8），命名空间 21 个；公开成员 742 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -126,6 +149,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 | `Astra.Hints` | `HintApi`、`HintManager`、`HintPositionMapping` |
 | `Astra.HumeShield` | `CustomHumeShieldApi`、`CustomHumeShieldEventHandler`、`ICustomHumeShieldBlocker`、`ICustomHumeShieldStat` |
 | `Astra.Items` | `CustomFirearm`、`CustomItem`、`CustomItemApi`、`CustomItemEventHandler`、`CustomJailbird`、`CustomMicroHid`、`CustomParticleDisruptor`、`ItemEntry` |
+| `Astra.Lifecycle` | `AstraLifecycle`、`RegistrationScope`、`RegistrationSource` |
 | `Astra.Loader` | `ICallOnRegister`、`ICallOnUnregister`、`IdentifiableManager<T>`、`MonoSingleton<T>` |
 | `Astra.Patching` | `IManualPatch`、`PatchApi`、`PatchStatus` |
 | `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`RoleEntry`、`StandardRole` |
@@ -242,6 +266,9 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 > 自定义技能对外静态 API，提供技能模板与玩家技能实例的查询能力。
 
 - `public static IReadOnlyCollection<CustomAbility> AbilityTemplates { get; }` — 获取当前已注册的全部技能模板。
+- `public static bool Register(CustomAbility ability)` — 按实例注册技能模板（外部框架 / JSON 适配器用）。
+- `public static bool Register(CustomAbility ability, RegistrationScope scope)` — 在指定注册作用域内按实例注册技能模板。
+- `public static bool Unregister(string id)` — 按 Id 注销技能模板。
 - `public static bool TryGetAbilityTemplate(string id, out CustomAbility ability)` — 按 Id 获取全局技能模板。
 - `public static bool TryGetAbilityTemplate(Type type, out CustomAbility ability)` — 按类型获取全局技能模板。
 - `public static bool TryGetAbilityTemplate<T>(out T ability) where T : CustomAbility, new()` — 按泛型类型获取全局技能模板。
@@ -1187,6 +1214,9 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public static Item? Give(Player player, string id)` — 按 Id 给玩家发放自定义物品。
 - `public static Item? Give<T>(Player player) where T : CustomItem` — 按类型给玩家发放自定义物品。
 - `public static void RegisterTemplate(Type type)` — 登记物品模板（框架自动扫描时调用，通常无需手动）。
+- `public static bool Register(CustomItem item)` — 按实例注册自定义物品定义（外部框架 / JSON 适配器用）。
+- `public static bool Register(CustomItem item, RegistrationScope scope)` — 在指定注册作用域内按实例注册自定义物品定义。
+- `public static bool Unregister(string id)` — 按 Id 注销自定义物品定义。
 - `public static void Initialize()` — 按模板实例化全部自定义物品（幂等，框架启动时自动调用）。
 
 #### `CustomItemEventHandler`
@@ -1282,6 +1312,57 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public override string ToString()`
 - `public static implicit operator ItemEntry(ItemType type)` — 原版物品类型隐式转换为条目。
 - `public static implicit operator ItemEntry(CustomItem item)` — 自定义物品定义隐式转换为条目。
+
+
+### `Astra.Lifecycle`
+
+#### `AstraLifecycle`
+
+`public static class AstraLifecycle`
+
+源码：`src/Astra.Framework/Lifecycle/AstraLifecycle.cs`
+
+> Astra 注册项的生命周期入口：按插件程序集创建作用域，或直接撤销某个来源的注册。
+
+- `public static RegistrationScope CreateScope(string pluginId, Assembly? assembly = null)` — 按插件 Id 与程序集创建注册作用域。
+- `public static RegistrationScope CreateScope(Type anchorType, string? pluginId = null)` — 以锚点类型所在程序集创建注册作用域。
+- `public static int UnregisterSource(Assembly assembly)` — 撤销指定程序集在 Astra 登记的全部可撤销内容。
+- `public static int UnregisterSource(Type anchorType)` — 撤销锚点类型所在程序集的全部可撤销内容。
+- `public static int UnregisterSource(RegistrationSource source)` — 按来源撤销登记项；来源带程序集时按程序集匹配。
+
+#### `RegistrationScope`
+
+`public sealed class RegistrationScope : IDisposable`
+
+源码：`src/Astra.Framework/Lifecycle/RegistrationScope.cs`
+
+> 一次性注册作用域：Dispose 时撤销该来源在 Astra 登记的全部可撤销内容。
+
+- `public RegistrationSource Source { get; }` — 作用域对应的注册来源。
+- `public bool IsDisposed { get; }` — 作用域是否已经释放。
+- `public int Unregister()` — 立即撤销该来源的全部登记项。重复调用不会重复撤销。
+- `public void Dispose()`
+
+#### `RegistrationSource`
+
+`public readonly struct RegistrationSource : IEquatable<RegistrationSource>`
+
+源码：`src/Astra.Framework/Lifecycle/RegistrationSource.cs`
+
+> 一次注册的来源标识。框架用它把注册内容与插件程序集关联起来，供按来源撤销使用。
+
+- `public RegistrationSource(string? pluginId, Assembly? assembly)` — 创建一个来源标识。
+- `public string PluginId { get; }` — 来源插件 Id；未显式提供时为空字符串。
+- `public Assembly? Assembly { get; }` — 来源程序集；未能解析时为 null。
+- `public bool IsValid { get; }` — 是否具备可撤销的来源（必须能解析到程序集）。
+- `public static RegistrationSource FromAssembly(Assembly assembly, string? pluginId = null)` — 按程序集创建来源。
+- `public static RegistrationSource FromType(Type type, string? pluginId = null)` — 按类型所在程序集创建来源。
+- `public static RegistrationSource For(string? pluginId, Assembly? assembly = null)` — 按插件 Id 与可选程序集创建来源。
+- `public bool Matches(Assembly? assembly)` — 判断来源是否指向指定程序集。
+- `public bool Equals(RegistrationSource other)`
+- `public override bool Equals(object? obj)`
+- `public override int GetHashCode()`
+- `public override string ToString()`
 
 
 ### `Astra.Loader`
@@ -1417,6 +1498,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public static bool TryGetRoleTemplate(string id, out CustomRole role)` — 按 Id 获取角色模板。
 - `public static bool TryGetRoleTemplate<T>(out T role) where T : CustomRole, new()` — 按类型获取角色模板。
 - `public static bool Register(CustomRole template)` — 按实例注册角色模板（外部框架 / 动态定义用）。
+- `public static bool Register(CustomRole template, RegistrationScope scope)` — 在指定注册作用域内按实例注册角色模板。
 - `public static bool Unregister(string id)` — 按 Id 注销角色模板。
 - `public static CustomRole? AddRole<T>(Player player) where T : CustomRole, new()` — 按泛型类型给玩家套用角色。
 - `public static CustomRole? AddRole(Player player, string id)` — 按 Id 给玩家套用角色。
@@ -1446,6 +1528,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public bool IsCustom { get; }` — 是否为自定义角色条目。
 - `public static RoleEntry Vanilla(RoleTypeId role)` — 声明一个原版角色条目。
 - `public static RoleEntry Custom(CustomRole role)` — 用自定义角色定义声明条目。
+- `public static RoleEntry Custom<T>() where T : CustomRole`
 - `public static RoleEntry Custom(string id)` — 用自定义角色 Id 声明条目；解析时再查模板注册表。
 - `public bool Equals(RoleEntry other)`
 - `public override bool Equals(object? obj)`
@@ -1541,6 +1624,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public static void Initialize()` — 按模板实例化阵营（幂等，框架启动时自动调用；跨回合复用不重建）。
 - `public static void RegisterTemplate(Type type)` — 登记阵营模板（框架自动扫描时调用，通常无需手动）。
 - `public static bool Register(CustomTeam team)` — 按实例注册阵营（外部框架 / 动态定义用）。
+- `public static bool Register(CustomTeam team, RegistrationScope scope)` — 在指定注册作用域内按实例注册阵营。
 - `public static bool Unregister(string id)` — 按 Id 注销阵营。
 
 #### `CustomTeamRelation`
@@ -1683,6 +1767,7 @@ C# 模板由自动注册扫描 Type 创建；Lua / 外部框架可直接注册�
 - `public static void Initialize()` — 按模板实例化波次（幂等，框架启动时自动调用，须晚于阵营实例化）。
 - `public static void RegisterTemplate(Type type)` — 登记波次模板（框架自动扫描时调用，通常无需手动）。
 - `public static bool Register(CustomWave wave)` — 按实例注册波次（外部框架 / 动态定义用）。
+- `public static bool Register(CustomWave wave, RegistrationScope scope)` — 在指定注册作用域内按实例注册波次。
 - `public static bool Unregister(string id)` — 按 Id 注销波次。
 - `public static void SetRoleSpawner(ICustomWaveRoleSpawner spawner)` — 注册角色生成器（宿主插件在启动时调用一次；会替换已有的生成器链）。
 - `public static void SetRoleSpawner(Func<string, Player, bool> trySpawn)` — 用委托注册角色生成器（会替换已有的生成器链）。

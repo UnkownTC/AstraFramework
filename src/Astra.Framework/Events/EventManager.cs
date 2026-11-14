@@ -104,6 +104,38 @@ namespace Astra.Events;
             return true;
         }
 
+        /// <summary>
+        /// 按类型注销事件处理器：普通处理器会禁用并移除，内容模板实例会走完整注销回调。
+        /// </summary>
+        /// <param name="type">处理器类型。</param>
+        /// <returns>确实移除过处理器时返回 <see langword="true"/>。</returns>
+        internal static bool UnregisterType(Type type)
+        {
+            if (type is null)
+                return false;
+
+            var removed = false;
+            foreach (var pair in _handlers.ToArray())
+            {
+                if (pair.Value.Handler.GetType() != type)
+                    continue;
+
+                TryDisableEntry(pair.Key, pair.Value);
+                _handlers.Remove(pair.Key);
+                removed = true;
+            }
+
+            foreach (var handler in _instanceHandlers.ToArray())
+            {
+                if (handler.GetType() != type)
+                    continue;
+
+                removed |= UnregisterInstance(handler);
+            }
+
+            return removed;
+        }
+
         internal static void UnregisterAll()
         {
             foreach (var pair in _handlers.ToArray())

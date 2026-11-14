@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using Astra.Attributes;
 using Astra.Roles;
@@ -30,30 +31,71 @@ namespace Astra.Abilities;
         /// 不同类型声明了相同 Id 时**拒绝新模板并保留旧模板**（绝不静默覆盖抛弃）；
         /// 同一类型重复注册则直接跳过（AutoRegister 幂等场景）。
         /// </remarks>
-        internal static void RegisterAbility(Type type)
+        internal static bool RegisterAbility(Type type)
         {
+            if (type is null)
+                return false;
+
             if (AbilitiesByType.TryGetValue(type, out var existedAbilityTemplate))
             {
                 Logger.Warn($"[CustomAbilityTemplateManager] 发现冲突Id {existedAbilityTemplate.Id}");
                 Logger.Warn($"[CustomAbilityTemplateManager] {type.FullName} 与 {existedAbilityTemplate.GetType().FullName} 发生冲突");
-                return;
+                return false;
             }
             if (Activator.CreateInstance(type) is not CustomAbility ability)
-                return;
+                return false;
 
-            if (RegisteredAbilities.TryGetValue(ability.Id, out var occupiedById) &&
-                occupiedById.GetType() != type)
+            return RegisterInstance(ability);
+        }
+
+        /// <summary>按实例注册技能模板（外部框架 / JSON 适配器用）。</summary>
+        /// <param name="ability">技能模板实例。</param>
+        /// <returns>登记成功（或同实例重复登记）返回 <see langword="true"/>；Id 冲突返回 <see langword="false"/>。</returns>
+        internal static bool RegisterInstance(CustomAbility ability)
+        {
+            if (ability is null || string.IsNullOrWhiteSpace(ability.Id))
+                return false;
+
+            if (RegisteredAbilities.TryGetValue(ability.Id, out var occupiedById))
             {
-                Logger.Warn($"[CustomAbilityTemplateManager] 技能 Id {ability.Id} 已被 {occupiedById.GetType().FullName} 占用，" +
-                            $"{type.FullName} 注册被拒绝（不覆盖既有模板）");
-                return;
+                if (ReferenceEquals(occupiedById, ability))
+                    return true;
+
+                Logger.Warn($"[CustomAbilityTemplateManager] 技能 Id {ability.Id} 已被 " +
+                            $"{occupiedById.GetType().FullName} 占用，{ability.GetType().FullName} 注册被拒绝（不覆盖既有模板）");
+                return false;
             }
 
             RegisteredAbilities[ability.Id] = ability;
-            AbilitiesByType[type] = ability;
+            if (!AbilitiesByType.ContainsKey(ability.GetType()))
+                AbilitiesByType[ability.GetType()] = ability;
 
             // 模板实例同时承担该类技能的事件监听（事件回调内按玩家查实例，不在模板上存状态）。
-            EventManager.RegisterInstance(ability, type);
+            EventManager.RegisterInstance(ability, ability.GetType());
+            return true;
+        }
+
+        /// <summary>按 Id 注销技能模板；玩家已获得的技能实例不受影响。</summary>
+        /// <param name="id">技能 Id。</param>
+        /// <returns>确实注销时返回 <see langword="true"/>。</returns>
+        internal static bool Unregister(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id) || !RegisteredAbilities.TryGetValue(id, out var ability))
+                return false;
+
+            RegisteredAbilities.Remove(id);
+
+            var type = ability.GetType();
+            if (AbilitiesByType.TryGetValue(type, out var mapped) && ReferenceEquals(mapped, ability))
+            {
+                AbilitiesByType.Remove(type);
+                var replacement = RegisteredAbilities.Values.FirstOrDefault(candidate => candidate.GetType() == type);
+                if (replacement is not null)
+                    AbilitiesByType[type] = replacement;
+            }
+
+            EventManager.UnregisterInstance(ability);
+            return true;
         }
 
         /// <inheritdoc />

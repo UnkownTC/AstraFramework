@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 
@@ -7,6 +8,7 @@ using Astra.Abilities;
 using Astra.Attributes;
 using Astra.Cancellation;
 using Astra.Items;
+using Astra.Lifecycle;
 using Astra.Patching;
 using Astra.Roles;
 using Astra.ServerSpecificSettings;
@@ -83,16 +85,22 @@ namespace Astra
             foreach (var type in teams)
                 CustomTeam.RegisterTemplate(type);
             CustomTeam.Initialize();
+            foreach (var type in teams)
+                TrackTeam(type);
 
             // ② Wave：登记模板 → 实例化（角色需要波次实例才能反向登记）
             foreach (var type in waves)
                 CustomWaveManager.RegisterTemplate(type);
             CustomWaveManager.Initialize();
+            foreach (var type in waves)
+                TrackWave(type);
 
             // ③ Item：登记模板 → 实例化（独立于角色/波次，供发放与事件溯源使用）
             foreach (var type in items)
                 CustomItemManager.RegisterTemplate(type);
             CustomItemManager.Initialize();
+            foreach (var type in items)
+                TrackItem(type);
 
             // ④ Role：注册模板并挂到其声明的波次
             foreach (var type in roles)
@@ -100,6 +108,7 @@ namespace Astra
                 try
                 {
                     CustomRoleTemplateManager.RegisterRole(type);
+                    TrackRole(type);
                 }
                 catch (Exception ex)
                 {
@@ -120,6 +129,7 @@ namespace Astra
             List<Type> items)
         {
             var registeredEvent = false;
+            var source = RegistrationSource.FromType(type);
 
             // [DisableAutoRegister] 的内容类型只登记、不自动注册：外部桥接的适配器类型可借此避免被当成模板。
             var disableAutoRegister = type.GetCustomAttribute<DisableAutoRegisterAttribute>() is not null;
@@ -133,17 +143,23 @@ namespace Astra
                     // 角色 / 技能的事件监听改由各自模板管理器用「唯一模板实例」注册，
                     // 这里不再额外实例化，避免同一类型在启动期被构造两次。
                     if (!typeof(ICustomContent).IsAssignableFrom(type))
+                    {
                         EventManager.Register(type);
+                        RegistrationTracking.EventHandler(type, source);
+                    }
                 }
 
                 if (typeof(ServerSpecificSettingBase).IsAssignableFrom(type))
                 {
                     ServerSpecificSettingManager.Register(type);
+                    RegistrationTracking.Setting(type, source);
                 }
 
                 if (!disableAutoRegister && typeof(CustomAbility).IsAssignableFrom(type))
                 {
-                    CustomAbilityTemplateManager.RegisterAbility(type);
+                    if (CustomAbilityTemplateManager.RegisterAbility(type) &&
+                        CustomAbilityApi.TryGetAbilityTemplate(type, out var ability))
+                        RegistrationTracking.Ability(ability, source);
                 }
 
                 if (!disableAutoRegister && typeof(CustomRole).IsAssignableFrom(type))
@@ -170,12 +186,14 @@ namespace Astra
             if (!registeredEvent && type.GetCustomAttribute<ManagedEventAttribute>() is not null)
             {
                 EventManager.Register(type);
+                RegistrationTracking.EventHandler(type, source);
             }
 
             if (type.GetCustomAttribute<ManagedPatchAttribute>() is not null &&
                 (type.IsDefined(typeof(HarmonyPatch), inherit: true) || typeof(IManualPatch).IsAssignableFrom(type)))
             {
                 PatchManager.PatchType(type, HarmonyInstance);
+                RegistrationTracking.PatchType(type, source);
             }
 
             // 方法级补丁：无需外层类标 [ManagedPatch]，由方法上的 [PatchMethod] 自带目标信息。
@@ -184,7 +202,10 @@ namespace Astra
                          BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
             {
                 if (patchMethod.IsDefined(typeof(PatchMethodAttribute), false))
+                {
                     PatchManager.PatchMethod(patchMethod, HarmonyInstance);
+                    RegistrationTracking.PatchMethod(patchMethod, source);
+                }
             }
 
             // 静态 [EventMethod] 方法没有实例，只能在此按类型扫描注册；
@@ -195,8 +216,43 @@ namespace Astra
                          BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
             {
                 if (eventMethod.IsDefined(typeof(EventMethodAttribute), inherit: false))
+                {
                     EventMethodManager.Register(eventMethod);
+                    RegistrationTracking.EventMethod(eventMethod, source);
+                }
             }
+        }
+
+        /// <summary>为已实例化的阵营登记来源撤销动作。</summary>
+        private static void TrackTeam(Type type)
+        {
+            var team = CustomTeam.All.Values.FirstOrDefault(candidate => candidate.GetType() == type);
+            if (team is not null)
+                RegistrationTracking.Team(team, RegistrationSource.FromType(type));
+        }
+
+        /// <summary>为已实例化的波次登记来源撤销动作。</summary>
+        private static void TrackWave(Type type)
+        {
+            var wave = CustomWaveManager.All.Values.FirstOrDefault(candidate => candidate.GetType() == type);
+            if (wave is not null)
+                RegistrationTracking.Wave(wave, RegistrationSource.FromType(type));
+        }
+
+        /// <summary>为已实例化的物品登记来源撤销动作。</summary>
+        private static void TrackItem(Type type)
+        {
+            var item = CustomItemApi.Items.Values.FirstOrDefault(candidate => candidate.GetType() == type);
+            if (item is not null)
+                RegistrationTracking.Item(item, RegistrationSource.FromType(type));
+        }
+
+        /// <summary>为已注册的角色模板登记来源撤销动作。</summary>
+        private static void TrackRole(Type type)
+        {
+            var role = CustomRoleApi.RoleTemplates.FirstOrDefault(candidate => candidate.GetType() == type);
+            if (role is not null)
+                RegistrationTracking.Role(role, RegistrationSource.FromType(type));
         }
 
         /// <summary>
@@ -219,6 +275,9 @@ namespace Astra
             CustomTeam.Clear();
             CustomRoleTemplateManager.Clear();
             CustomAbilityTemplateManager.Clear();
+
+            // 全局清理已覆盖全部注册项；台账中的撤销委托到此失效，清空避免下次启动重复执行。
+            RegistrationLedger.Clear();
         }
 
         /// <summary>展开异常链，避免 TargetInvocationException 把真实原因藏在内层。</summary>

@@ -26,6 +26,9 @@ internal static class CustomItemManager
 
     private static readonly List<Type> Templates = [];
 
+    /// <summary>已经实例化过的模板类型，避免重复调用 <see cref="Initialize"/> 时重复构造。</summary>
+    private static readonly HashSet<Type> InitializedTemplates = [];
+
     /// <summary>每个具体物品类型是否覆写了 <see cref="CustomItem.OnShooting"/> 的缓存。</summary>
     private static readonly Dictionary<Type, bool> ShootingOverrideCache = [];
 
@@ -46,50 +49,113 @@ internal static class CustomItemManager
             Templates.Add(type);
     }
 
-    /// <summary>按模板实例化全部自定义物品（幂等）。</summary>
+    /// <summary>按模板实例化全部自定义物品（幂等；允许在初始化后追加模板再调用）。</summary>
     internal static void Initialize()
     {
-        if (Registry.Count > 0)
-            return;
-
-        foreach (var type in Templates)
+        foreach (var type in Templates.ToArray())
         {
+            if (!InitializedTemplates.Add(type))
+                continue;
+
             try
             {
-                if (Activator.CreateInstance(type, nonPublic: true) is not CustomItem item ||
-                    string.IsNullOrWhiteSpace(item.Id))
-                {
-                    LabApi.Features.Console.Logger.Warn(
-                        $"[CustomItemManager] 模板 {type.Name} 实例化失败或缺少 Id，已跳过。");
-                    continue;
-                }
-
-                if (Registry.TryGetValue(item.Id, out var sameId))
-                {
-                    LabApi.Features.Console.Logger.Warn(
-                        $"[CustomItemManager] 物品 Id 重复：{item.Id}（{sameId.GetType().Name} 已被 {type.Name} 覆盖）。");
-                    NotifyUnregister(sameId);
-                }
-
-                if (ByItemType.TryGetValue(item.BaseItem, out var sameBase))
-                {
-                    LabApi.Features.Console.Logger.Warn(
-                        $"[CustomItemManager] 物品类型 {item.BaseItem} 已被 {sameBase.GetType().Name} 占用，" +
-                        $"{type.Name} 无法通过类型识别。");
-                }
-                else
-                {
-                    ByItemType[item.BaseItem] = item;
-                }
-
-                Registry[item.Id] = item;
-                NotifyRegister(item);
+                InstantiateTemplate(type);
             }
             catch (Exception ex)
             {
                 LabApi.Features.Console.Logger.Error($"[CustomItemManager] 模板 {type.Name} 实例化异常：{ex.Message}");
             }
         }
+    }
+
+    /// <summary>按实例登记一个已构造的自定义物品定义（外部框架 / JSON 适配器用）。</summary>
+    /// <param name="item">物品定义实例。</param>
+    /// <returns>登记成功（或同实例重复登记）返回 <see langword="true"/>；Id 冲突返回 <see langword="false"/>。</returns>
+    internal static bool RegisterInstance(CustomItem item)
+    {
+        if (item is null || string.IsNullOrWhiteSpace(item.Id))
+            return false;
+
+        if (Registry.TryGetValue(item.Id, out var existing))
+        {
+            if (ReferenceEquals(existing, item))
+                return true;
+
+            LabApi.Features.Console.Logger.Warn(
+                $"[CustomItemManager] 物品 Id 重复：{item.Id}（{existing.GetType().Name} 已存在，{item.GetType().Name} 被拒绝）。");
+            return false;
+        }
+
+        if (ByItemType.TryGetValue(item.BaseItem, out var sameBase))
+        {
+            LabApi.Features.Console.Logger.Warn(
+                $"[CustomItemManager] 物品类型 {item.BaseItem} 已被 {sameBase.GetType().Name} 占用，" +
+                $"{item.GetType().Name} 仍按 Id 登记，但无法通过类型识别。");
+        }
+        else
+        {
+            ByItemType[item.BaseItem] = item;
+        }
+
+        Registry[item.Id] = item;
+        NotifyRegister(item);
+        return true;
+    }
+
+    /// <summary>按 Id 注销自定义物品定义；玩家已持有的物品实例不受影响。</summary>
+    /// <param name="id">物品 Id。</param>
+    /// <returns>确实注销时返回 <see langword="true"/>。</returns>
+    internal static bool Unregister(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || !Registry.TryGetValue(id, out var item))
+            return false;
+
+        Registry.Remove(id);
+
+        if (ByItemType.TryGetValue(item.BaseItem, out var mapped) && ReferenceEquals(mapped, item))
+        {
+            ByItemType.Remove(item.BaseItem);
+            var replacement = Registry.Values.FirstOrDefault(candidate => candidate.BaseItem == item.BaseItem);
+            if (replacement is not null)
+                ByItemType[item.BaseItem] = replacement;
+        }
+
+        NotifyUnregister(item);
+        InitializedTemplates.Remove(item.GetType());
+        return true;
+    }
+
+    /// <summary>按模板类型构造并登记一个物品定义。</summary>
+    private static void InstantiateTemplate(Type type)
+    {
+        if (Activator.CreateInstance(type, nonPublic: true) is not CustomItem item ||
+            string.IsNullOrWhiteSpace(item.Id))
+        {
+            LabApi.Features.Console.Logger.Warn(
+                $"[CustomItemManager] 模板 {type.Name} 实例化失败或缺少 Id，已跳过。");
+            return;
+        }
+
+        if (Registry.TryGetValue(item.Id, out var sameId))
+        {
+            LabApi.Features.Console.Logger.Warn(
+                $"[CustomItemManager] 物品 Id 重复：{item.Id}（{sameId.GetType().Name} 已被 {type.Name} 覆盖）。");
+            NotifyUnregister(sameId);
+        }
+
+        if (ByItemType.TryGetValue(item.BaseItem, out var sameBase))
+        {
+            LabApi.Features.Console.Logger.Warn(
+                $"[CustomItemManager] 物品类型 {item.BaseItem} 已被 {sameBase.GetType().Name} 占用，" +
+                $"{type.Name} 无法通过类型识别。");
+        }
+        else
+        {
+            ByItemType[item.BaseItem] = item;
+        }
+
+        Registry[item.Id] = item;
+        NotifyRegister(item);
     }
 
     /// <summary>按 Id 查找物品定义。</summary>
@@ -152,6 +218,7 @@ internal static class CustomItemManager
             NotifyUnregister(item);
 
         Templates.Clear();
+        InitializedTemplates.Clear();
         Registry.Clear();
         ByItemType.Clear();
         Tracked.Clear();

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
+using Astra.Lifecycle;
+
 namespace Astra.Teams;
 
 /// <summary>自定义阵营对外 API：注册表查询与每回合实例化。</summary>
@@ -43,7 +45,32 @@ public static class CustomTeamApi
     /// <param name="team">阵营实例。</param>
     /// <returns>注册成功（或同实例重复注册）返回 <see langword="true"/>；未初始化或 Id 冲突返回 <see langword="false"/>。</returns>
     /// <remarks>须在框架自动注册完成后调用，否则会因阵营实例化早退而丢失 C# 模板。</remarks>
-    public static bool Register(CustomTeam team) => CustomTeam.RegisterInstance(team);
+    public static bool Register(CustomTeam team)
+    {
+        if (team is null || !CustomTeam.RegisterInstance(team))
+            return false;
+
+        RegistrationTracking.Team(team, RegistrationSource.FromType(team.GetType()));
+        return true;
+    }
+
+    /// <summary>在指定注册作用域内按实例注册阵营。</summary>
+    /// <param name="team">阵营实例。</param>
+    /// <param name="scope">注册作用域；释放时按作用域来源撤销该阵营。</param>
+    /// <returns>注册成功（或同实例重复注册）返回 <see langword="true"/>；未初始化或 Id 冲突返回 <see langword="false"/>。</returns>
+    public static bool Register(CustomTeam team, RegistrationScope scope)
+    {
+        if (team is null)
+            return false;
+        if (scope is null)
+            throw new ArgumentNullException(nameof(scope));
+
+        if (!CustomTeam.RegisterInstance(team))
+            return false;
+
+        RegistrationTracking.Team(team, scope.Source);
+        return true;
+    }
 
     /// <summary>按 Id 注销阵营。</summary>
     /// <param name="id">阵营 Id。</param>

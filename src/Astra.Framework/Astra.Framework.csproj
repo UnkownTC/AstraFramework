@@ -184,6 +184,11 @@
     <Compile Include="Items\CustomMicroHid.cs" />
     <Compile Include="Items\CustomParticleDisruptor.cs" />
     <Compile Include="Items\ItemEntry.cs" />
+    <Compile Include="Lifecycle\AstraLifecycle.cs" />
+    <Compile Include="Lifecycle\RegistrationLedger.cs" />
+    <Compile Include="Lifecycle\RegistrationScope.cs" />
+    <Compile Include="Lifecycle\RegistrationSource.cs" />
+    <Compile Include="Lifecycle\RegistrationTracking.cs" />
     <Compile Include="Loader\AutoRegister.cs" />
     <Compile Include="Loader\ICallOnRegister.cs" />
     <Compile Include="Loader\ICallOnUnregister.cs" />

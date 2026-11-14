@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+using Astra.Lifecycle;
+
 using LabApi.Features.Wrappers;
 // ReSharper disable MemberCanBePrivate.Global
 
@@ -12,6 +14,42 @@ namespace Astra.Abilities;
     {
         /// <summary>获取当前已注册的全部技能模板。</summary>
         public static IReadOnlyCollection<CustomAbility> AbilityTemplates => CustomAbilityTemplateManager.AbilityTemplates;
+
+        /// <summary>按实例注册技能模板（外部框架 / JSON 适配器用）。</summary>
+        /// <param name="ability">技能模板实例。</param>
+        /// <returns>登记成功（或同实例重复登记）返回 <see langword="true"/>；Id 冲突返回 <see langword="false"/>。</returns>
+        /// <remarks>玩家已获得的技能实例不会因模板注销被移除。</remarks>
+        public static bool Register(CustomAbility ability)
+        {
+            if (ability is null || !CustomAbilityTemplateManager.RegisterInstance(ability))
+                return false;
+
+            RegistrationTracking.Ability(ability, RegistrationSource.FromType(ability.GetType()));
+            return true;
+        }
+
+        /// <summary>在指定注册作用域内按实例注册技能模板。</summary>
+        /// <param name="ability">技能模板实例。</param>
+        /// <param name="scope">注册作用域；释放时按作用域来源撤销该技能。</param>
+        /// <returns>登记成功（或同实例重复登记）返回 <see langword="true"/>；Id 冲突返回 <see langword="false"/>。</returns>
+        public static bool Register(CustomAbility ability, RegistrationScope scope)
+        {
+            if (ability is null)
+                return false;
+            if (scope is null)
+                throw new ArgumentNullException(nameof(scope));
+
+            if (!CustomAbilityTemplateManager.RegisterInstance(ability))
+                return false;
+
+            RegistrationTracking.Ability(ability, scope.Source);
+            return true;
+        }
+
+        /// <summary>按 Id 注销技能模板。</summary>
+        /// <param name="id">技能 Id。</param>
+        /// <returns>确实注销时返回 <see langword="true"/>。</returns>
+        public static bool Unregister(string id) => CustomAbilityTemplateManager.Unregister(id);
 
         /// <summary>按 Id 获取全局技能模板。</summary>
         public static bool TryGetAbilityTemplate(string id, out CustomAbility ability)

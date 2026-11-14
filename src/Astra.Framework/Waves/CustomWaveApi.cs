@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
+using Astra.Lifecycle;
+
 using LabApi.Features.Wrappers;
 
 namespace Astra.Waves;
@@ -45,7 +47,32 @@ public static class CustomWaveApi
     /// <param name="wave">波次实例。</param>
     /// <returns>注册成功（或同实例重复注册）返回 <see langword="true"/>；未初始化、Id 冲突或阵营依赖缺失返回 <see langword="false"/>。</returns>
     /// <remarks>须在框架自动注册完成后调用，否则会因波次实例化早退而丢失 C# 模板。</remarks>
-    public static bool Register(CustomWave wave) => CustomWaveManager.RegisterInstance(wave);
+    public static bool Register(CustomWave wave)
+    {
+        if (wave is null || !CustomWaveManager.RegisterInstance(wave))
+            return false;
+
+        RegistrationTracking.Wave(wave, RegistrationSource.FromType(wave.GetType()));
+        return true;
+    }
+
+    /// <summary>在指定注册作用域内按实例注册波次。</summary>
+    /// <param name="wave">波次实例。</param>
+    /// <param name="scope">注册作用域；释放时按作用域来源撤销该波次。</param>
+    /// <returns>注册成功（或同实例重复注册）返回 <see langword="true"/>；未初始化、Id 冲突或阵营依赖缺失返回 <see langword="false"/>。</returns>
+    public static bool Register(CustomWave wave, RegistrationScope scope)
+    {
+        if (wave is null)
+            return false;
+        if (scope is null)
+            throw new ArgumentNullException(nameof(scope));
+
+        if (!CustomWaveManager.RegisterInstance(wave))
+            return false;
+
+        RegistrationTracking.Wave(wave, scope.Source);
+        return true;
+    }
 
     /// <summary>按 Id 注销波次。</summary>
     /// <param name="id">波次 Id。</param>

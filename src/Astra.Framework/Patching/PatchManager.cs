@@ -45,6 +45,51 @@ namespace Astra.Patching;
                 TryApplyEntry(id, entry);
         }
 
+        /// <summary>按补丁类型撤销补丁（来源作用域撤销用）。</summary>
+        /// <param name="type">补丁类型。</param>
+        /// <returns>确实撤销时返回 <see langword="true"/>。</returns>
+        internal static bool UnpatchType(Type type)
+        {
+            if (type is null)
+                return false;
+
+            var id = type.FullName ?? type.Name;
+            if (!TryResolveEntry(id, out var resolvedId, out var entry) || entry.PatchType != type)
+                return false;
+
+            return TryUnpatchEntry(resolvedId, entry);
+        }
+
+        /// <summary>按补丁方法撤销该方法登记的全部方法级补丁。</summary>
+        /// <param name="patchMethod">补丁方法。</param>
+        /// <returns>确实撤销至少一个目标时返回 <see langword="true"/>。</returns>
+        internal static bool UnpatchMethod(MethodInfo patchMethod)
+        {
+            if (patchMethod is null)
+                return false;
+
+            var removed = false;
+            foreach (var pair in _methodPatches.ToArray())
+            {
+                if (!ReferenceEquals(pair.Value.PatchMethod, patchMethod))
+                    continue;
+
+                try
+                {
+                    pair.Value.Harmony.Unpatch(pair.Value.Target, pair.Value.PatchMethod);
+                    removed = true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"[PatchManager] 方法补丁 {pair.Key} 撤销失败：{ex}");
+                }
+
+                _methodPatches.Remove(pair.Key);
+            }
+
+            return removed;
+        }
+
         public static void UnpatchAll()
         {
             foreach (var pair in _patches.ToArray())
