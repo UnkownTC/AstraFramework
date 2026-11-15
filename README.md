@@ -17,6 +17,8 @@ AstraFramework 是运行在 SCP: Secret Laboratory 服务端的**框架库**，�
 
 > 本仓库只包含抽象与机制；具体角色、物品、波次等实现应放在业务插件中。
 
+> 下载：[GitHub Releases](https://github.com/UnkownTC/AstraFramework/releases) · 文档：[公开 API 速查](docs/API.md) · [架构规范](docs/STANDARD.md)
+
 ## 特性
 
 | 领域 | 提供的能力 |
@@ -143,6 +145,31 @@ scope.Dispose();
 
 `libs/` 为本地只读依赖目录（游戏与 LabAPI 公开化程序集），已由 `.gitignore` 排除，不随仓库分发；构建前请自行准备该目录。构建不读取本机 Steam 安装目录。
 
+## 服务端部署
+
+Astra 是**库**，不是独立插件；单独把 `Astra.Framework.dll` 放进插件目录不会产生自定义内容，还需要至少一个引用 Astra 的业务插件。
+
+1. 安装带 LabAPI 的 SCP: Secret Laboratory 专用服务器。
+2. 从 [Releases](https://github.com/UnkownTC/AstraFramework/releases) 下载 `Astra.Framework.dll`，放入 LabAPI 插件目录（与业务插件同级）。
+3. 放入业务插件并启动服务器；Astra 会以最高加载优先级先于业务插件初始化。
+
+Release 只附带 `Astra.Framework.dll`，**不附带任何依赖 DLL**。运行所需的其他程序集按下表准备；标有「服务端自带」的不要复制到插件目录，缺失时应修复服务端或 LabAPI 安装。
+
+| 程序集 | 来源 / 部署说明 |
+|---|---|
+| `Astra.Framework.dll` | 本 Release 提供 |
+| `LabApi.dll` | LabAPI 1.1.7 提供，随 LabAPI 安装 |
+| `0Harmony.dll` | Harmony 2.4.2；LabAPI 通常已附带，缺失时补 2.4.2 |
+| `Assembly-CSharp.dll`、`Assembly-CSharp-firstpass.dll`、`CommandSystem.Core.dll`、`Mirror.dll` | SCP:SL 服务端 `Managed/` 自带 |
+| `UnityEngine.CoreModule.dll`、`UnityEngine.PhysicsModule.dll` | SCP:SL 服务端 `Managed/` 自带 |
+| `SecretLabNAudio.Core.dll`、`NAudio.Core.dll` | SCP:SL 服务端音频运行时依赖；缺失时补 2.1.2 / 2.2.1 |
+| `HintServiceMeow.dll` | HintServiceMeow 6.0.0，第三方插件；使用提示 / HUD 相关 API 时必须安装，且应使用原版插件，不要使用 Publicized 版 |
+
+- `*-Publicized.dll` 只用于编译期引用，运行时绑定的是服务端原版程序集，不要部署。
+- `Astra.Analyzers.dll` 只用于编译期分析，不需要部署。
+- `libs/` 与构建输出中的其他 DLL（包括构建时复制的引用副本和 `astratest.exe` / `dispatchprobe.exe` 等探针）都不需要放到服务端。
+- 未安装 `HintServiceMeow` 时，框架可以加载，但不要调用 `HintApi` / `HintManager` 等提示相关 API。
+
 ## 构建
 
 ```bash
@@ -165,7 +192,7 @@ python tools/vsbuild.py src/Astra.Analyzers/Astra.Analyzers.csproj -p:Configurat
 | 分析器 | `artifacts/build/Astra.Analyzers/[<Platform>/]<Configuration>/netstandard2.0/Astra.Analyzers.dll` |
 | 构建日志 | `artifacts/logs/vsbuild-<时间戳>.log` |
 
-发布时从 `artifacts/build/...` 取 DLL；`artifacts/` 不提交。
+发布时从 `artifacts/build/...` 取 DLL；`artifacts/` 不提交。GitHub Release 只上传 `Astra.Framework.dll`，不附带依赖，部署方式见[服务端部署](#服务端部署)。
 
 ## 项目结构
 
