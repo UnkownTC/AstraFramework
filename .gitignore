@@ -5,9 +5,15 @@ obj/
 
 # IDE
 .vs/
+.vscode/
 .idea/
 *.user
 *.suo
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
 
 # 日志
 *.log
