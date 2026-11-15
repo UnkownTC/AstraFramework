@@ -3,7 +3,7 @@
 | 项 | 值 |
 |---|---|
 | 状态 | 现行 |
-| 版本基线 | Astra 3.6.0 |
+| 版本基线 | Astra 3.7.0 |
 | 日期 | 2026-11-15 |
 | 适用范围 | AstraFramework 仓库（SCP: Secret Laboratory 服务端框架库） |
 | 事实来源 | `src/` 与 `docs/API.md`；两者冲突时以源码为准 |

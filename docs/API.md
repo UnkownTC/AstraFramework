@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `3.6.0`（`Directory.Build.props`） |
+| 适用版本 | `3.7.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -1604,7 +1604,7 @@ _scope.Dispose();
 - `public bool IsCustom { get; }` — 是否为自定义角色条目。
 - `public static RoleEntry Vanilla(RoleTypeId role)` — 声明一个原版角色条目。
 - `public static RoleEntry Custom(CustomRole role)` — 用自定义角色定义声明条目。
-- `public static RoleEntry Custom<T>() where T : CustomRole`
+- `public static RoleEntry Custom<T>() where T : CustomRole` — 用已注册的自定义角色模板类型声明条目。
 - `public static RoleEntry Custom(string id)` — 用自定义角色 Id 声明条目；解析时再查模板注册表。
 - `public bool Equals(RoleEntry other)`
 - `public override bool Equals(object? obj)`
