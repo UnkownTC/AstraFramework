@@ -9,6 +9,7 @@
 ![Version](https://img.shields.io/badge/version-3.7.0-2ea043)
 ![Framework](https://img.shields.io/badge/.NET%20Framework-4.8.1-512bd4)
 ![Platform](https://img.shields.io/badge/platform-SCP%3A%20SL%20server-6f42c1)
+![License](https://img.shields.io/badge/license-MIT-yellow)
 
 </div>
 
@@ -98,3 +99,7 @@ tools/                   vsbuild.py、ApiDoc.cs
 - 新增公开类型 / 方法：MINOR
 - 修改或删除公开签名：MAJOR（需标注 `BREAKING` 并同步 `docs/API.md`）
 - 内部实现修复：PATCH
+
+## 许可证
+
+本项目使用 [MIT License](LICENSE)。
