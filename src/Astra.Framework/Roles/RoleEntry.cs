@@ -54,6 +54,14 @@ public readonly struct RoleEntry : IEquatable<RoleEntry>
         return new RoleEntry(role.RoleType, role, role.Id);
     }
 
+    public static RoleEntry Custom<T>() where T : CustomRole
+    {
+        if (!CustomRoleTemplateManager.TryGetRoleTemplate(typeof(T), out var role))
+            throw new InvalidOperationException($"未注册自定义角色模板 {typeof(T).FullName}。");
+
+        return new RoleEntry(role.RoleType, role, role.Id);
+    }
+
     /// <summary>用自定义角色 Id 声明条目；解析时再查模板注册表。</summary>
     /// <param name="id">自定义角色 Id。</param>
     /// <returns>角色条目。</returns>

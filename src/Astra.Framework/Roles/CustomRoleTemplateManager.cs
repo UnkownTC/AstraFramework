@@ -110,15 +110,9 @@ internal sealed class CustomRoleTemplateManager
         return true;
     }
 
-    internal static bool TryGetRoleTemplate(string id, out CustomRole role)
-    {
-        return RegisteredRoles.TryGetValue(id, out role);
-    }
+    internal static bool TryGetRoleTemplate(string id, out CustomRole role) => RegisteredRoles.TryGetValue(id, out role);
 
-    internal static bool TryGetRoleTemplate(Type type, out CustomRole role)
-    {
-        return RolesByType.TryGetValue(type, out role);
-    }
+    internal static bool TryGetRoleTemplate(Type type, out CustomRole role) => RolesByType.TryGetValue(type, out role);
 
     internal static bool TryGetRoleTemplate<T>(out T role) where T : CustomRole
     {
