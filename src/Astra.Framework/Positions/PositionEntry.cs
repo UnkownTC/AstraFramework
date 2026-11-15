@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 using Astra.Extensions;
 
+using LabApi.Features.Wrappers;
+
 using MapGeneration;
 
 using UnityEngine;
@@ -178,4 +180,11 @@ public readonly struct PositionEntry
         position = room.transform.TransformPoint(LocalPosition);
         return true;
     }
+
+    /// <summary>
+    /// 将玩家传送到本条目解析出的世界坐标（不修改朝向）。
+    /// </summary>
+    /// <param name="player">目标玩家。</param>
+    /// <returns>位置可解析且玩家有效时返回 <see langword="true"/>。</returns>
+    public bool Teleport(Player player) => player.Teleport(this);
 }

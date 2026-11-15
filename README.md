@@ -6,7 +6,7 @@
 
 基于 LabAPI · 自定义内容 · 托管补丁 · 声明式事件
 
-![Version](https://img.shields.io/badge/version-3.7.0-2ea043)
+![Version](https://img.shields.io/badge/version-4.0.0-2ea043)
 ![Framework](https://img.shields.io/badge/.NET%20Framework-4.8.1-512bd4)
 ![Platform](https://img.shields.io/badge/platform-SCP%3A%20SL%20server-6f42c1)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
@@ -29,7 +29,7 @@ AstraFramework 是运行在 SCP: Secret Laboratory 服务端的**框架库**，�
 | 事件 | `[EventMethod]` 声明式订阅、增强事件处理器、事件生命周期管理 |
 | 补丁 | `[PatchMethod]` / `[ManagedPatch]` 托管 Harmony 补丁，按版本与状态查询 |
 | 注册生命周期 | `Astra.Lifecycle`：按程序集记录注册来源，插件禁用时协作式撤销 |
-| 位置 / 刷新点 | `PositionEntry`、`SpawnPointEntry`、`ISpawnOnRoundStart` |
+| 位置 / 刷新点 | `PositionEntry`、`SpawnPointEntry`、`PositionTeleport`；`RoundStartSpawnManager` 在原版分配完成后按概率生成波次角色与物品 |
 | 分析器 | Roslyn 分析器校验事件、补丁与契约用法（AST1001–AST5005） |
 
 ## CustomContent 示例
@@ -115,6 +115,38 @@ public sealed class ScoutWave : CustomWave
     ];
 }
 ```
+
+### 回合开始生成
+
+波次、角色或物品实现 `ISpawnOnRoundStart` 后，`RoundStartSpawnManager` 会在原版角色分配完成后读取刷新点与概率：
+
+```csharp
+using System.Collections.Generic;
+
+using Astra.Positions;
+using Astra.Waves;
+
+public sealed class ScoutWave : CustomWave, ISpawnOnRoundStart
+{
+    public override string Id => "scout_wave";
+    public override string Name => "侦察波次";
+
+    public override IReadOnlyList<WaveSpawnEntry> Spawns { get; } =
+    [
+        WaveSpawnEntry.Custom("scout", 2),
+    ];
+
+    public int MaxSpawnCount => 2;
+
+    public IReadOnlyDictionary<SpawnPointEntry, float> SpawnPoints { get; } =
+        new Dictionary<SpawnPointEntry, float>
+        {
+            [SpawnPointEntry.Random()] = 0.5f,
+        };
+}
+```
+
+只替换与角色 `RoleType` 相同的原版玩家，不改变本回合 SCP 数量；`MaxSpawnCount` 限制每次最多生成数。物品实现接口时会在点位置创建原版 `BaseItem`，不会发放到玩家背包。
 
 ### 注册与按来源撤销
 
@@ -203,6 +235,7 @@ src/Astra.Framework/     框架主程序集（按域分目录）
   Abilities/ HumeShield/技能与护盾扩展
   Events/ Patching/     事件与托管补丁
   Lifecycle/ Positions/ 注册生命周期、位置与刷新点
+  Spawning/             回合开始生成调度
   Commands/ Loader/     RA 指令、启动与自动注册
 src/Astra.Analyzers/     Roslyn 分析器
 docs/                    架构规范与公开 API
@@ -221,7 +254,7 @@ tools/                   vsbuild.py、ApiDoc.cs
 
 ## 版本
 
-当前版本：**3.7.0**
+当前版本：**4.0.0**
 
 采用 `MAJOR.MINOR.PATCH`：
 

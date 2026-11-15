@@ -13,10 +13,10 @@ namespace Astra
         {
             base.OnServerPluginsEnabled();
             var assemblies = PluginLoader.Plugins.Values;
-            if (!AutoRegister.RegisterAll(assemblies))
-                return;
+            if (AutoRegister.RegisterAll(assemblies))
+                LabApi.Features.Console.Logger.Info("[MainManager] 所有管理器完成加载");
 
-            LabApi.Features.Console.Logger.Info("[MainManager] 所有管理器完成加载");
+            Astra.Spawning.RoundStartSpawnManager.Initialize();
         }
 
     }

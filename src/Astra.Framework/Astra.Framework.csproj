@@ -206,7 +206,9 @@
     <Compile Include="Patching\PatchManager.cs" />
     <Compile Include="Positions\ISpawnOnRoundStart.cs" />
     <Compile Include="Positions\PositionEntry.cs" />
+    <Compile Include="Positions\PositionTeleport.cs" />
     <Compile Include="Positions\SpawnPointEntry.cs" />
+    <Compile Include="Spawning\RoundStartSpawnManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Roles\CustomRole.cs" />
     <Compile Include="Roles\CustomRoleApi.cs" />

@@ -2,6 +2,18 @@
 
 本项目的重要变更记录。版本号遵循 `MAJOR.MINOR.PATCH`。
 
+## [4.0.0] - 2026-11-16
+
+### Added
+
+- `RoundStartSpawnManager`：在原版角色分配完成后，按 `ISpawnOnRoundStart` 的刷怪点概率与 `MaxSpawnCount` 生成波次角色或物品。
+- `PositionEntry.Teleport` / `SpawnPointEntry.Teleport` 与 `PositionTeleport` 扩展方法。
+
+### Changed
+
+- **BREAKING**：`ISpawnOnRoundStart` 新增 `MaxSpawnCount` 成员；实现方必须补充该属性。
+- 版本升至 4.0.0。
+
 ## [3.7.0] - 2026-11-15
 
 ### Added
