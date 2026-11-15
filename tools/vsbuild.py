@@ -6,8 +6,7 @@ vsbuild.py — 用 Visual Studio Build Tools 的「.NET Framework MSBuild」构�
 背景
 ----
 工作区默认构建入口是 `dotnet build`（.NET Core MSBuild）。.NET Core MSBuild 不含
-`ResolveComReference` 任务，因此任何带 `<COMReference>` 的工程（例如
-`src/Site19/SteveFramework`）都会报：
+`ResolveComReference` 任务，因此任何带 `<COMReference>` 的工程都会报：
 
     MSB4803: .NET Core 版本的 MSBuild 不支持 "ResolveComReference"
 
@@ -15,7 +14,7 @@ vsbuild.py — 用 Visual Studio Build Tools 的「.NET Framework MSBuild」构�
 COM 引用，从而打通此类工程。
 
 本机实测（2026-10-04）：探测到的是**完整版 Visual Studio** 的实例 ——
-`D:\\Programs\\Microsoft Visual Studio\\18\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe`
+`%ProgramFiles%\\Microsoft Visual Studio\\<版本>\\MSBuild\\Current\\Bin\\MSBuild.exe`
 （版本 18.10.1）。注意该可执行文件**不能在命令行里直接敲**（安全策略按 LOLBin 拦截，
 命令文本出现其名字即被拒）；经本脚本用 `subprocess` 调起则可正常工作 ——
 所以需要 COM 桥接或 `.slnx` 构建时，一律走 `python tools/vsbuild.py ...`。
@@ -25,10 +24,9 @@ COM 引用，从而打通此类工程。
     python tools/vsbuild.py <msbuild 参数...>
 
 常用：
-    python tools/vsbuild.py src/Site19/SteveFramework/SteveFramework.csproj `
+    python tools/vsbuild.py src/Astra.Framework/Astra.Framework.csproj `
         -p:Configuration=Release -p:Platform=x64 -t:Restore;Build
     python tools/vsbuild.py -version
-    python tools/vsbuild.py AI-Workspace.slnx -p:Configuration=Release -p:Platform=x64
 
 参数说明
 --------

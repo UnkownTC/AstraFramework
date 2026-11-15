@@ -85,7 +85,6 @@ tools/                   vsbuild.py、ApiDoc.cs
 - [架构规范](docs/STANDARD.md) — 命名空间、可见性、依赖方向与构建约定
 - [公开 API 速查](docs/API.md) — 对外类型与成员清单
 - [待补清单](docs/ASTRA-PENDING.md) — 尚未完成的能力与设计缺口
-- [迁移清单](docs/MIGRATION-PLUGINCONTENT.md) — PluginContent 迁移状态
 - [协作约定](AGENTS.md) — 提交、构建与交付规范
 
 `docs/API.md` 的生成段由 `dotnet run tools/ApiDoc.cs` 维护；可用 `dotnet run tools/ApiDoc.cs -- --check` 校验文档漂移。

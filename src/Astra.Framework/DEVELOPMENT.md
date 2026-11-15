@@ -10,7 +10,6 @@
 | [`docs/STANDARD.md`](../../docs/STANDARD.md) | 现行框架规范（命名空间、可见性、依赖、分析器、构建） |
 | [`docs/API.md`](../../docs/API.md) | 公开 API 速查（含自动生成段） |
 | [`docs/ASTRA-PENDING.md`](../../docs/ASTRA-PENDING.md) | 待补能力与已知修复留档 |
-| [`docs/MIGRATION-PLUGINCONTENT.md`](../../docs/MIGRATION-PLUGINCONTENT.md) | Site19.PluginContent 迁移清单 |
 
 构建（net481 必须走封装脚本）：
 

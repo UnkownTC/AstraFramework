@@ -84,7 +84,7 @@
       <HintPath>$(LibsRoot)harmony/2.4.2/0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Pooling">
-      <HintPath>..\..\..\..\..\..\..\..\Programs\Steam\steamapps\common\SCP Secret Laboratory Dedicated Server\SCPSL_Data\Managed\Pooling.dll</HintPath>
+      <HintPath>$(LibsRoot)scpsl-server/current/Pooling.dll</HintPath>
     </Reference>
     <Reference Include="SecretLabNAudio.Core">
       <HintPath>$(LibsRoot)audio/current/SecretLabNAudio.Core.dll</HintPath>
