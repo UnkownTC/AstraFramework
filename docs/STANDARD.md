@@ -3,8 +3,8 @@
 | 项 | 值 |
 |---|---|
 | 状态 | 现行 |
-| 版本基线 | Astra 3.4.0 |
-| 日期 | 2026-11-14 |
+| 版本基线 | Astra 3.5.0 |
+| 日期 | 2026-11-15 |
 | 适用范围 | AstraFramework 仓库（SCP: Secret Laboratory 服务端框架库） |
 | 事实来源 | `src/` 与 `docs/API.md`；两者冲突时以源码为准 |
 | 优先级 | `AGENTS.md` > 本文档 > 代码注释 |
@@ -28,6 +28,7 @@
 | `Astra` | 插件入口、配置、自动注册与共享契约 | `AstraPlugin`、`AutoRegister`、`Config`、`MainManager`、`IIdentifiable`、`ICustomContent` |
 | `Astra.Loader` | 注册顺序与生命周期契约 | `ICallOnRegister`、`ICallOnUnregister`、`IdentifiableManager<T>`、`MonoSingleton<T>` |
 | `Astra.Lifecycle` | 注册来源标识与按来源撤销 | `AstraLifecycle`、`RegistrationSource`、`RegistrationScope` |
+| `Astra.Positions` | 通用位置与刷怪点 | `PositionEntry`、`SpawnPointEntry` |
 | `Astra.Roles` | 自定义角色 | `CustomRole`、`StandardRole`、`CustomRoleApi`、`RoleEntry`、`IOriginalRole` |
 | `Astra.Teams` | 自定义阵营与阵营关系 | `CustomTeam`、`CustomTeamApi`、`CustomTeamResolver`、`CustomTeamRelation`、`RelationEntry`、`RelationEntryKind`、`TeamRef` |
 | `Astra.Waves` | 自定义波次、刷新、排序与调度 | `CustomWave`、`CustomWaveApi`、`ICustomWaveRoleSpawner`、`ICustomWaveRoleSpawnerV2`、`IWaveSpawnRole`、`IWaveSpawnCountProvider`、`WaveScheduler`、`SupportWavePool`、`WeightedWaveAdapter`、`WaveComposition`、`WaveSpawnEntry`、`VanillaWaveDispatch`、`VanillaWaveAdapter` |
@@ -63,6 +64,7 @@ src/Astra.Framework/
 │   ├── AutoRegister.cs, MainManager.cs                              → Astra（历史例外）
 │   └── ICallOnRegister.cs, ICallOnUnregister.cs, ...                → Astra.Loader
 ├── Lifecycle/   → Astra.Lifecycle
+├── Positions/    → Astra.Positions
 ├── Roles/        → Astra.Roles
 ├── Teams/        → Astra.Teams
 ├── Waves/        → Astra.Waves
@@ -104,7 +106,7 @@ src/Astra.Framework/
 | 扩展接口 | `IIdentifiable`、`ICustomContent`、`ICallOnRegister`、`ICallOnUnregister`、`ICustomWaveRoleSpawner`、`ICustomWaveRoleSpawnerV2`、`IWaveSpawnRole`、`IWaveSpawnCountProvider`、`IWaveSorter<T>`、`IWeightedWave`、`IAbilityRole`、`IKeybind`、`ICooldown`、`IPlayerCondition`、`IEffects`、`ICustomHumeShieldStat`、`ICustomHumeShieldBlocker`、`IOriginalRole`、`IManualPatch` |
 | API 入口 | `CustomRoleApi`、`CustomTeamApi`、`CustomWaveApi`、`CustomItemApi`、`CustomAbilityApi`、`CustomEffectApi`、`CustomHumeShieldApi`、`PatchApi`、`EventApi`、`HintApi`、`AudioApi`、`CountdownApi`、`CancellationTokenApi` |
 | 公共运行时 | `CustomAbilityManager`、`HintManager`、`CountdownManager`、`ServerSpecificSettingManager`、`EventMethodManager`、`CustomEffectController`、`CustomEffectHandler`、`CustomItemEventHandler`、`CustomHumeShieldEventHandler`、`EnhancedEventsHandler` |
-| 值对象 / DTO | `EffectEntry`、`ItemEntry`、`RoleEntry`、`WaveSpawnEntry`、`WaveComposition`、`RelationEntry`、`TeamRef`、`CustomTeamRelation`、`PatchStatus`、`EventHandlerStatus`、`RegistrationSource` |
+| 值对象 / DTO | `EffectEntry`、`ItemEntry`、`RoleEntry`、`WaveSpawnEntry`、`WaveComposition`、`RelationEntry`、`TeamRef`、`CustomTeamRelation`、`PatchStatus`、`EventHandlerStatus`、`RegistrationSource`、`PositionEntry`、`SpawnPointEntry` |
 | 生命周期 | `AstraLifecycle`、`RegistrationScope` |
 | 事件与标注 | `PlayerEvents`、`ShootingEventArgs`、`ShotEventArgs`；`Astra.Attributes` 下的特性；`Astra.Enums` 下的枚举 |
 
@@ -130,11 +132,12 @@ src/Astra.Framework/
 | 允许 | 避免 |
 |---|---|
 | 域内自由引用 | 业务域之间互相静态调用 |
-| 任意域 → `Enums` / `Attributes` / `Extensions` / `Events`（参数） | 基类反向依赖业务域管理器 |
+| 任意域 → `Enums` / `Attributes` / `Extensions` / `Events`（参数） / `Positions` | 基类反向依赖业务域管理器 |
 | `Loader` → 各域（决定注册顺序） | 域之间循环依赖 |
 | `Commands` → 各域 API（指令入口） | 事件参数持有业务域的可变状态 |
 | `Patches` → 各域（框架自带补丁） | `public` 签名暴露 `internal` 类型 |
 | 各域 → `Lifecycle`（登记来源） | `Lifecycle` 反向依赖各域 |
+| 各域 → `Positions`（共享位置值对象） | `Positions` 反向依赖各域 |
 
 跨域协作优先使用：注册顺序 → 事件 → 显式注入。
 

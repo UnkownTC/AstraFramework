@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `3.4.0`（`Directory.Build.props`） |
+| 适用版本 | `3.5.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -98,6 +98,7 @@ _scope.Dispose();
 | 自定义阵营 | `CustomTeam` | 查询 `CustomTeamApi.Teams` / `Find` / `Find<T>` | 一次性实例化、跨回合复用，可直接持有实例引用 |
 | 自定义波次 | `CustomWave`（`Id` / `Name` / `Teams`：`IReadOnlyList<TeamRef>`）；角色侧实现 `IWaveSpawnRole` 声明归属与默认数量，波次可用 `Spawns`（`WaveSpawnEntry`）额外声明 / 覆盖刷新项 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`SetRoleSpawner`）或 `ICustomWaveRoleSpawnerV2`（`AddRoleSpawner`）；执行 `CustomWaveApi.Spawn`；加权调度用 `WaveScheduler` | `Roles` / `Table` 用 `RoleEntry`（原版 + 自定义可混编）；角色可用 `IWaveSpawnCountProvider` 按波次声明数量；波次实现 `IWeightedWave` 后 `WaveScheduler.Load/Advance` 按权重与人数门槛推进；主阵营读 `Team`（`TeamRef`）；无生成器时原版角色由框架直接套用、自定义角色会失败；支援池用 `SupportWavePool`（Register / SetWeight / Pick / GetWithFallback）；原版波次标记用 `VanillaWaveDispatch` / `VanillaWaveAdapter`；`CustomWaveApi.Spawn(id, players)` 可直接执行 |
 | 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火；装备 / 拾取 / 使用 / 投掷 / 换弹 / 瞄准 / 命中均有可覆写钩子 |
+| 刷怪点 / 位置 | `PositionEntry` / `SpawnPointEntry` | 构造 `PositionEntry.Find(Vector3)` / `Find(RoomIdentifier, local)` / `Find(RoomName/Zone/Shape/组合, local)` / `Random(local)`；`SpawnPointEntry.Find(...)` / `Random(...)`；解析 `TryGetWorldPosition` / `TryResolve` | 精确世界坐标或具体房间稳定；只给筛选条件时解析阶段随机选房；未指定旋转时 `TryResolve` 返回随机水平朝向；具体房间引用失效时回退到筛选条件重新选房 |
 | 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明；`CanStack = true` 时同类效果经 `CustomEffectController.AddEffect` 叠加层数（强度 ×层数、时长累加） |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
 | 休谟护盾 | `ICustomHumeShieldStat`（`StandardRole` 已实现） | 随角色套用自动接管生灭 | `HumeShieldCurve` 非空时以曲线为准 |
@@ -128,7 +129,7 @@ _scope.Dispose();
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 109 个（class 74 / enum 8 / interface 19 / struct 8），命名空间 21 个；公开成员 742 个。
+- **统计**：公开类型 112 个（class 75 / enum 8 / interface 19 / struct 10），命名空间 22 个；公开成员 775 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -145,13 +146,14 @@ _scope.Dispose();
 | `Astra.Effects` | `CustomEffect`、`CustomEffectApi`、`CustomEffectController`、`CustomEffectHandler`、`Effect`、`EffectEntry`、`IEffects` |
 | `Astra.Enums` | `AbilityFailReason`、`CancellationTokenCategory`、`EffectClassification`、`EffectType`、`HintPosition`、`KeybindType` |
 | `Astra.Events` | `EnhancedEventsHandler`、`EventApi`、`EventHandlerStatus`、`EventMethodManager`、`PlayerEvents`、`ShootingEventArgs`、`ShotEventArgs` |
-| `Astra.Extensions` | `MapExtensions`、`PlayerEffectExtensions`、`PlayerExtensions` |
+| `Astra.Extensions` | `CollectionExtensions`、`MapExtensions`、`PlayerEffectExtensions`、`PlayerExtensions` |
 | `Astra.Hints` | `HintApi`、`HintManager`、`HintPositionMapping` |
 | `Astra.HumeShield` | `CustomHumeShieldApi`、`CustomHumeShieldEventHandler`、`ICustomHumeShieldBlocker`、`ICustomHumeShieldStat` |
 | `Astra.Items` | `CustomFirearm`、`CustomItem`、`CustomItemApi`、`CustomItemEventHandler`、`CustomJailbird`、`CustomMicroHid`、`CustomParticleDisruptor`、`ItemEntry` |
 | `Astra.Lifecycle` | `AstraLifecycle`、`RegistrationScope`、`RegistrationSource` |
 | `Astra.Loader` | `ICallOnRegister`、`ICallOnUnregister`、`IdentifiableManager<T>`、`MonoSingleton<T>` |
 | `Astra.Patching` | `IManualPatch`、`PatchApi`、`PatchStatus` |
+| `Astra.Positions` | `PositionEntry`、`SpawnPointEntry` |
 | `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`RoleEntry`、`StandardRole` |
 | `Astra.ServerSpecificSettings` | `ServerSpecificSettingBase`、`ServerSpecificSettingManager` |
 | `Astra.Teams` | `CustomTeam`、`CustomTeamApi`、`CustomTeamRelation`、`CustomTeamResolver`、`RelationEntry`、`RelationEntryKind`、`TeamRef` |
@@ -1007,6 +1009,18 @@ _scope.Dispose();
 
 ### `Astra.Extensions`
 
+#### `CollectionExtensions`
+
+`public static class CollectionExtensions`
+
+源码：`src/Astra.Framework/Extensions/CollectionExtensions.cs`
+
+> 集合随机取值扩展。
+
+- `public static T? GetRandom<T>(this IReadOnlyList<T> list)` — 从只读列表随机取一个元素。
+- `public static T? GetRandom<T>(this IEnumerable<T> enumerable)` — 从可枚举序列随机取一个元素；非集合序列会先物化为数组。
+- `public static T? GetRandom<T>(this T[] array)` — 从数组随机取一个元素。
+
 #### `MapExtensions`
 
 `public static class MapExtensions`
@@ -1452,6 +1466,57 @@ _scope.Dispose();
 - `public Type PatchType { get; }`
 - `public string TypeFullName { get; }`
 - `public bool IsEnabled { get; }`
+
+
+### `Astra.Positions`
+
+#### `PositionEntry`
+
+`public readonly struct PositionEntry`
+
+源码：`src/Astra.Framework/Positions/PositionEntry.cs`
+
+> 位置条目：表示精确世界坐标，或「房间筛选条件 + 房间内本地坐标」。
+
+- `public RoomName RoomName { get; }` — 房间名称；具体房间条目为其实际名称，筛选条目为筛选值。
+- `public FacilityZone FacilityZone { get; }` — 区域；具体房间条目为其实际区域，筛选条目为筛选值。
+- `public RoomShape RoomShape { get; }` — 房间形状；具体房间条目为其实际形状，筛选条目为筛选值。
+- `public Vector3 LocalPosition { get; }` — 房间内本地坐标；纯世界坐标条目为 zero。
+- `public bool HasWorldPosition { get; }` — 是否持有精确世界坐标。
+- `public Vector3 WorldPosition { get; }` — 解析后的世界坐标。房间条目会随机选择一个匹配房间；无法解析时返回 zero。
+- `public IReadOnlyList<RoomIdentifier> Rooms { get; }` — 匹配的房间集合。具体房间条目只包含该房间；世界坐标条目只包含包含该点的房间。
+- `public RoomIdentifier? Room { get; }` — 随机选择一个匹配房间；具体房间条目返回该房间。
+- `public static PositionEntry Find(Vector3 worldPosition)` — 按世界坐标创建；若坐标位于房间内，会同时记录具体房间和本地坐标。
+- `public static PositionEntry Find(RoomIdentifier room, Vector3 localPosition)` — 按具体房间 + 房间内本地坐标创建。
+- `public static PositionEntry Find(RoomName roomName, Vector3 localPosition)` — 按房间名称 + 本地坐标创建；多个匹配房间时解析阶段随机选房。
+- `public static PositionEntry Find(FacilityZone zone, Vector3 localPosition)` — 按区域 + 本地坐标创建；多个匹配房间时解析阶段随机选房。
+- `public static PositionEntry Find(RoomShape shape, Vector3 localPosition)` — 按房间形状 + 本地坐标创建；多个匹配房间时解析阶段随机选房。
+- `public static PositionEntry Find(RoomName? roomName, FacilityZone? zone, RoomShape? shape, Vector3 localPosition)` — 按组合筛选条件 + 本地坐标创建；未给出的条件视为不限，解析阶段随机选房。
+- `public static PositionEntry Random(Vector3 localPosition = default)` — 创建「随机房间 + 本地坐标」条目。
+- `public bool TryGetWorldPosition(out Vector3 position)` — 尝试解析世界坐标；筛选条目会随机选择一个匹配房间。
+
+#### `SpawnPointEntry`
+
+`public readonly struct SpawnPointEntry`
+
+源码：`src/Astra.Framework/Positions/SpawnPointEntry.cs`
+
+> 刷怪点条目：位置 + 可选旋转。
+
+- `public SpawnPointEntry(PositionEntry position, Quaternion? rotation = null)` — 构造刷怪点条目。
+- `public PositionEntry Position { get; }` — 位置条目。
+- `public Quaternion? Rotation { get; }` — 显式旋转；未指定时为 null。
+- `public bool HasRotation { get; }` — 是否显式指定了旋转。
+- `public Vector3 WorldPosition { get; }` — 解析后的世界坐标；条件不明确时可能随机变化。
+- `public bool TryResolve(out Vector3 position, out Quaternion rotation)` — 解析为具体的世界坐标与旋转。
+- `public Quaternion ResolveRotation()` — 解析旋转；未指定时返回一个随机水平朝向。
+- `public static SpawnPointEntry Find(Vector3 worldPosition, Quaternion? rotation = null)` — 按世界坐标创建刷怪点。
+- `public static SpawnPointEntry Find(RoomIdentifier room, Vector3 localPosition, Quaternion? rotation = null)` — 按具体房间 + 本地坐标创建刷怪点。
+- `public static SpawnPointEntry Find(RoomName roomName, Vector3 localPosition, Quaternion? rotation = null)` — 按房间名称 + 本地坐标创建刷怪点；多个匹配房间时解析阶段随机选择。
+- `public static SpawnPointEntry Find(FacilityZone zone, Vector3 localPosition, Quaternion? rotation = null)` — 按区域 + 本地坐标创建刷怪点；多个匹配房间时解析阶段随机选择。
+- `public static SpawnPointEntry Find(RoomShape shape, Vector3 localPosition, Quaternion? rotation = null)` — 按房间形状 + 本地坐标创建刷怪点；多个匹配房间时解析阶段随机选择。
+- `public static SpawnPointEntry Find(RoomName? roomName, FacilityZone? zone, RoomShape? shape, Vector3 localPosition, Quaternion? rotation = null)` — 按组合筛选条件 + 本地坐标创建刷怪点；未给出的条件视为不限，解析阶段随机选房。
+- `public static SpawnPointEntry Random(Vector3 localPosition = default, Quaternion? rotation = null)` — 创建「随机房间 + 本地坐标」刷怪点。
 
 
 ### `Astra.Roles`
