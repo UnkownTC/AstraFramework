@@ -1,3 +1,6 @@
+# 本地只读依赖（游戏 / LabAPI 公开化程序集，不提交）
+libs/
+
 # 构建产物
 artifacts/
 bin/

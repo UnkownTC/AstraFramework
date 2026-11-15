@@ -27,8 +27,111 @@ AstraFramework 是运行在 SCP: Secret Laboratory 服务端的**框架库**，�
 | 事件 | `[EventMethod]` 声明式订阅、增强事件处理器、事件生命周期管理 |
 | 补丁 | `[PatchMethod]` / `[ManagedPatch]` 托管 Harmony 补丁，按版本与状态查询 |
 | 注册生命周期 | `Astra.Lifecycle`：按程序集记录注册来源，插件禁用时协作式撤销 |
-| 位置 / 刷怪点 | `PositionEntry`、`SpawnPointEntry`、`ISpawnOnRoundStart` |
+| 位置 / 刷新点 | `PositionEntry`、`SpawnPointEntry`、`ISpawnOnRoundStart` |
 | 分析器 | Roslyn 分析器校验事件、补丁与契约用法（AST1001–AST5005） |
+
+## CustomContent 示例
+
+下面是最小骨架，完整签名以 [公开 API 速查](docs/API.md) 为准，命名空间与依赖方向见 [架构规范](docs/STANDARD.md)。示例省略宿主插件的启用/禁用流程与命名空间声明。
+
+### 自定义角色
+
+```csharp
+using System.Collections.Generic;
+
+using Astra.Items;
+using Astra.Roles;
+using Astra.Teams;
+
+using InventorySystem.Items;
+
+using PlayerRoles;
+
+public sealed class ScoutRole : CustomRole
+{
+    public override string Id => "scout";
+    public override string Name => "侦察兵";
+    public override RoleTypeId RoleType => RoleTypeId.ClassD;
+
+    // 自定义阵营可写成 TeamRef.FromCustom(team)；原版阵营可直接隐式转换。
+    public override TeamRef Team => PlayerRoles.Team.ChaosInsurgency;
+
+    public override float MaxHealth { get; set; } = 120f;
+
+    public override IReadOnlyList<ItemEntry> Items { get; set; } =
+        [ItemEntry.Vanilla(ItemType.Medkit)];
+}
+```
+
+> 若用同一个适配器类从配置生成多个角色，请覆写 `CreateInstance()` 复制定义数据；默认实现只按类型实例化，会丢失实例上的配置。
+
+### 自定义物品
+
+```csharp
+using Astra.Items;
+
+using InventorySystem.Items;
+using InventorySystem.Items.Usables;
+
+using LabApi.Features.Wrappers;
+
+using UnityEngine;
+
+public sealed class StimItem : CustomItem
+{
+    public override string Id => "stim";
+    public override string Name => "兴奋剂";
+    public override ItemType BaseItem => ItemType.Medkit;
+
+    // 返回 false 阻止原版使用；如需消耗物品，请在自定义逻辑里自行处理。
+    public override bool OnUsing(Player player, UsableItem item)
+    {
+        player.Health = Mathf.Min(player.MaxHealth, player.Health + 50f);
+        return false;
+    }
+}
+```
+
+### 自定义波次
+
+```csharp
+using System.Collections.Generic;
+
+using Astra.Waves;
+
+using PlayerRoles;
+
+public sealed class ScoutWave : CustomWave
+{
+    public override string Id => "scout_wave";
+    public override string Name => "侦察波次";
+
+    public override IReadOnlyList<WaveSpawnEntry> Spawns { get; } =
+    [
+        WaveSpawnEntry.Custom("scout", 2),
+        WaveSpawnEntry.Vanilla(RoleTypeId.ClassD, -1),
+    ];
+}
+```
+
+### 注册与按来源撤销
+
+```csharp
+using Astra.Items;
+using Astra.Lifecycle;
+using Astra.Roles;
+using Astra.Waves;
+
+// 需在 Astra 自动注册完成后调用（如服务器就绪事件）；不要直接在插件 OnEnabled 里注册波次。
+var scope = AstraLifecycle.CreateScope("MyPlugin", typeof(ScoutRole).Assembly);
+
+CustomRoleApi.Register(new ScoutRole(), scope);
+CustomItemApi.Register(new StimItem(), scope);
+CustomWaveApi.Register(new ScoutWave(), scope);
+
+// 插件禁用时：按注册逆序撤销，幂等，且不会触碰插件直接向 LabAPI 订阅的内容。
+scope.Dispose();
+```
 
 ## 环境要求
 
@@ -38,7 +141,7 @@ AstraFramework 是运行在 SCP: Secret Laboratory 服务端的**框架库**，�
 - Python 3（构建脚本）
 - Visual Studio Build Tools / 完整 .NET Framework MSBuild
 
-游戏与 LabAPI 公开化程序集已随仓库放在 `libs/`，构建不依赖本机 Steam 安装目录。
+`libs/` 为本地只读依赖目录（游戏与 LabAPI 公开化程序集），已由 `.gitignore` 排除，不随仓库分发；构建前请自行准备该目录。构建不读取本机 Steam 安装目录。
 
 ## 构建
 
@@ -72,11 +175,11 @@ src/Astra.Framework/     框架主程序集（按域分目录）
   Items/ Effects/       自定义物品、效果
   Abilities/ HumeShield/技能与护盾扩展
   Events/ Patching/     事件与托管补丁
-  Lifecycle/ Positions/ 注册生命周期、位置与刷怪点
+  Lifecycle/ Positions/ 注册生命周期、位置与刷新点
   Commands/ Loader/     RA 指令、启动与自动注册
 src/Astra.Analyzers/     Roslyn 分析器
 docs/                    架构规范与公开 API
-libs/                    只读依赖（游戏 / LabAPI 公开化程序集）
+libs/                    本地只读依赖（游戏 / LabAPI 公开化程序集，不提交）
 tools/                   vsbuild.py、ApiDoc.cs
 ```
 
