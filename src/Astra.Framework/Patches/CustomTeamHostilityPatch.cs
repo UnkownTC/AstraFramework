@@ -436,11 +436,15 @@ internal static class CustomTeamScp096GateTranspiler
                 continue;   // 形态不符，保持原样（不误伤）
 
             // [ldloc hitbox][get_TargetHub][GetTeam][IsEnemy] → [ldloc hitbox][call 解析器]
-            var labels = codes[hubIndex + 1].labels;
-            labels.AddRange(codes[hubIndex + 2].labels);
+            // hubIndex 指向 get_TargetHub，必须连同 GetTeam 一起删除；此前误删了
+            // GetTeam/IsEnemy，留下 get_TargetHub，导致解析器收到 ReferenceHub。
+            var labels = codes[hubIndex].labels
+                .Concat(codes[hubIndex + 1].labels)
+                .Concat(codes[i].labels)
+                .ToList();
 
+            codes[hubIndex] = new CodeInstruction(OpCodes.Nop);
             codes[hubIndex + 1] = new CodeInstruction(OpCodes.Nop);
-            codes[hubIndex + 2] = new CodeInstruction(OpCodes.Nop);
             codes[i] = new CodeInstruction(OpCodes.Call, GateResolver).WithLabels(labels);
             break;
         }

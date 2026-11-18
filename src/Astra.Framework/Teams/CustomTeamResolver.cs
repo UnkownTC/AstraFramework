@@ -83,9 +83,19 @@ public static class CustomTeamResolver
     /// <param name="attackerTeam">原版传入的攻击方阵营（恒为 <see cref="Team.SCPs"/>，忽略）。</param>
     /// <param name="hitbox">受击命中盒。</param>
     /// <returns>敌对返回 <see langword="true"/>；无法判定（无自定义阵营/无效目标）交回原版结果。</returns>
+    /// <remarks>
+    /// <see cref="HitboxIdentity.TargetHub"/> 无条件解引用 <c>CharacterModel</c>；
+    /// 命中盒已销毁或尚未完成初始化时该字段为 <see langword="null"/>，
+    /// 而 Unity 伪空对象的 <c>is null</c> 为 <see langword="false"/>，会在 getter 内抛
+    /// <see cref="NullReferenceException"/>。因此先判命中盒自身与模型引用，无效时直接返回敌对，
+    /// 与「原版结果无法计算时保留伤害」的兜底语义一致。
+    /// </remarks>
     public static bool IsEnemy096HitGate(Team attackerTeam, HitboxIdentity hitbox)
     {
-        var hub = hitbox is null ? null : hitbox.TargetHub;
+        if (hitbox == null || hitbox.CharacterModel == null)
+            return true;
+
+        var hub = hitbox.CharacterModel.OwnerHub;
 
         if (hub is null)
             return true;

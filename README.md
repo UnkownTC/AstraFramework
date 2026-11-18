@@ -6,7 +6,7 @@
 
 基于 LabAPI · 自定义内容 · 托管补丁 · 声明式事件
 
-![Version](https://img.shields.io/badge/version-4.0.0-2ea043)
+![Version](https://img.shields.io/badge/version-4.0.1-2ea043)
 ![Framework](https://img.shields.io/badge/.NET%20Framework-4.8.1-512bd4)
 ![Platform](https://img.shields.io/badge/platform-SCP%3A%20SL%20server-6f42c1)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
@@ -254,7 +254,7 @@ tools/                   vsbuild.py、ApiDoc.cs
 
 ## 版本
 
-当前版本：**4.0.0**
+当前版本：**4.0.1**
 
 采用 `MAJOR.MINOR.PATCH`：
 

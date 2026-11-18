@@ -200,6 +200,7 @@
     <Compile Include="Patches\ComponentApplyPatch.cs" />
     <Compile Include="Patches\CustomTeamHostilityPatch.cs" />
     <Compile Include="Patches\HitscanHitregModuleBasePatch.cs" />
+    <Compile Include="Patches\QueryProcessorOnDestroyGuardPatch.cs" />
     <Compile Include="Patches\ShotBacktrackDataPatch.cs" />
     <Compile Include="Patching\IManualPatch.cs" />
     <Compile Include="Patching\PatchApi.cs" />

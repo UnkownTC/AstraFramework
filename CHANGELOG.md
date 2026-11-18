@@ -2,6 +2,14 @@
 
 本项目的重要变更记录。版本号遵循 `MAJOR.MINOR.PATCH`。
 
+## [4.0.1] - 2026-11-19
+
+### Fixed
+
+- SCP-096 挥击门禁转译偏移错误：原实现误删 `GetTeam`/`IsEnemy` 而保留 `get_TargetHub`，使 `IsEnemy096HitGate` 的第二个参数收到 `ReferenceHub` 并触发 `NullReferenceException`，玩家被踢线。已改为同时删除 `get_TargetHub`/`GetTeam`，并保留 `CharacterModel` 判空作为防御。
+- 原版 `RemoteAdmin.QueryProcessor.OnDestroy` 在 `_sender.OutputId` 为 null 时以 null 调用 `TryRemove` 导致 `ArgumentNullException`；新增前缀补丁在此时跳过清理，避免干扰玩家断线流程。
+- 版本升至 4.0.1。
+
 ## [4.0.0] - 2026-11-16
 
 ### Added
