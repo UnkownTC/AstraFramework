@@ -205,7 +205,7 @@
     <Compile Include="Patching\IManualPatch.cs" />
     <Compile Include="Patching\PatchApi.cs" />
     <Compile Include="Patching\PatchManager.cs" />
-    <Compile Include="Positions\ISpawnable.cs" />
+    <Compile Include="Positions\ISpawnDefinition.cs" />
     <Compile Include="Positions\PositionEntry.cs" />
     <Compile Include="Positions\PositionTeleport.cs" />
     <Compile Include="Positions\SpawnPointEntry.cs" />

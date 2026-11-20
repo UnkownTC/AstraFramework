@@ -2,6 +2,15 @@
 
 本项目的重要变更记录。版本号遵循 `MAJOR.MINOR.PATCH`。
 
+## [6.0.0] - 2026-11-20
+
+### Changed
+
+- **BREAKING**：`ISpawnable` 更名为 `ISpawnDefinition`，`SpawnPoints` 更名为 `CustomSpawnPoints`；移除 `SpawnOnRoundStart`，`RoundStartSpawnManager` 不再要求显式 opt-in。
+- `StandardRole` 虚实现 `ISpawnDefinition`：默认 `MinAmount = 0`、`MaxSpawnCount = 0`、`CustomSpawnPoints` 为空；需要参与自动生成的角色自行覆写。
+- `StandardRole.AddRole` 在 `SpawnFlags` 含 `UseSpawnpoint` 时，从 `CustomSpawnPoints` 按概率选点并传送；空集合不传送；管理器对 `UseSpawnpoint` 角色不再重复传送。
+- 版本升至 6.0.0。
+
 ## [5.0.0] - 2026-11-20
 
 ### Changed

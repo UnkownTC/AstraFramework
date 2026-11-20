@@ -19,8 +19,8 @@ using Logger = LabApi.Features.Console.Logger;
 namespace Astra.Spawning;
 
 /// <summary>
-/// 回合开始生成管理器：在原版角色分配完成后，读取所有 <see cref="ISpawnable"/>，
-/// 按 <see cref="ISpawnable.SpawnOnRoundStart"/>、刷怪点概率与生成数量上下限生成波次角色或物品。
+/// 回合开始生成管理器：在原版角色分配完成后，读取所有 <see cref="ISpawnDefinition"/>，
+/// 按刷新点概率与生成数量上下限生成波次角色或物品。
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,8 +28,9 @@ namespace Astra.Spawning;
 /// 自定义角色只会替换与自身 <see cref="CustomRole.RoleType"/> 相同的原版角色玩家。
 /// </para>
 /// <para>
-/// 只有 <see cref="ISpawnable.SpawnOnRoundStart"/> 为 <see langword="true"/> 的提供者才会执行。
-/// <see cref="ISpawnable.SpawnPoints"/> 为空时，角色/波次仍会生成但不传送；物品仍需要至少一个刷怪点。
+/// <see cref="ISpawnDefinition.CustomSpawnPoints"/> 为空时，角色/波次仍会生成但不传送；物品仍需要至少一个刷新点。
+/// <see cref="StandardRole"/> 自行按 <see cref="StandardRole.CustomSpawnPoints"/> 处理
+/// <see cref="RoleSpawnFlags.UseSpawnpoint"/> 的传送，本管理器不再重复传送，避免覆盖角色选择。
 /// </para>
 /// <para>
 /// 除自动收集已注册的 <see cref="CustomWave"/>、<see cref="CustomRole"/>
@@ -38,7 +39,7 @@ namespace Astra.Spawning;
 /// </remarks>
 public static class RoundStartSpawnManager
 {
-    private static readonly List<ISpawnable> ExtraProviders = new();
+    private static readonly List<ISpawnDefinition> ExtraProviders = new();
     private static readonly HashSet<Type> WarnedProviderTypes = new();
     private static readonly HashSet<Type> WarnedItemWithoutSpawnPointTypes = new();
     private static bool _initialized;
@@ -76,7 +77,7 @@ public static class RoundStartSpawnManager
     /// <summary>登记一个额外的生成提供者。</summary>
     /// <param name="provider">生成提供者。</param>
     /// <remarks>重复登记同一实例无副作用；自动注册的内容不需要手动登记。</remarks>
-    public static void Register(ISpawnable provider)
+    public static void Register(ISpawnDefinition provider)
     {
         if (provider is null)
             return;
@@ -88,7 +89,7 @@ public static class RoundStartSpawnManager
     /// <summary>注销一个手动登记的生成提供者。</summary>
     /// <param name="provider">生成提供者。</param>
     /// <returns>确实移除时返回 <see langword="true"/>。</returns>
-    public static bool Unregister(ISpawnable provider) =>
+    public static bool Unregister(ISpawnDefinition provider) =>
         provider is not null && ExtraProviders.Remove(provider);
 
     /// <summary>
@@ -98,9 +99,6 @@ public static class RoundStartSpawnManager
     {
         foreach (var provider in CollectProviders())
         {
-            if (!provider.SpawnOnRoundStart)
-                continue;
-
             try
             {
                 Spawn(provider);
@@ -114,9 +112,9 @@ public static class RoundStartSpawnManager
 
     private static void OnPlayersSpawned() => Run();
 
-    private static List<ISpawnable> CollectProviders()
+    private static List<ISpawnDefinition> CollectProviders()
     {
-        var providers = new List<ISpawnable>();
+        var providers = new List<ISpawnDefinition>();
 
         foreach (var provider in ExtraProviders)
             AddProvider(providers, provider);
@@ -133,9 +131,9 @@ public static class RoundStartSpawnManager
         return providers;
     }
 
-    private static void AddProvider(ICollection<ISpawnable> providers, object candidate)
+    private static void AddProvider(ICollection<ISpawnDefinition> providers, object candidate)
     {
-        if (candidate is not ISpawnable provider)
+        if (candidate is not ISpawnDefinition provider)
             return;
 
         if (providers.Any(existing => ReferenceEquals(existing, provider)))
@@ -144,7 +142,7 @@ public static class RoundStartSpawnManager
         providers.Add(provider);
     }
 
-    private static void Spawn(ISpawnable provider)
+    private static void Spawn(ISpawnDefinition provider)
     {
         var maxSpawnCount = provider.MaxSpawnCount;
         if (maxSpawnCount <= 0)
@@ -154,12 +152,12 @@ public static class RoundStartSpawnManager
         if (minAmount > maxSpawnCount)
             minAmount = maxSpawnCount;
 
-        var spawnPoints = provider.SpawnPoints;
-        var hasSpawnPoints = spawnPoints is { Count: > 0 };
+        var spawnPoints = provider.CustomSpawnPoints;
+        var hasCustomSpawnPoints = spawnPoints is { Count: > 0 };
         var points = SelectPoints(spawnPoints, maxSpawnCount, minAmount);
 
-        // 非空刷怪点全部未通过概率判定时，本次不生成；空字典表示允许无传送生成。
-        if (hasSpawnPoints && points.Count == 0)
+        // 非空刷新点全部未通过概率判定时，本次不生成；空字典表示允许无传送生成。
+        if (hasCustomSpawnPoints && points.Count == 0)
             return;
 
         switch (provider)
@@ -171,7 +169,7 @@ public static class RoundStartSpawnManager
             case CustomItem item:
                 if (points.Count == 0)
                 {
-                    WarnItemWithoutSpawnPoints(item.GetType());
+                    WarnItemWithoutCustomSpawnPoints(item.GetType());
                     break;
                 }
 
@@ -229,6 +227,14 @@ public static class RoundStartSpawnManager
         return selected;
     }
 
+    /// <summary>
+    /// <see cref="StandardRole"/> 使用 <see cref="RoleSpawnFlags.UseSpawnpoint"/> 时由角色自身传送，
+    /// 管理器不再重复覆盖其选择。
+    /// </summary>
+    private static bool ShouldManagerTeleport(CustomRole role) =>
+        role is not StandardRole standard ||
+        (standard.SpawnFlags & RoleSpawnFlags.UseSpawnpoint) == 0;
+
     private static void SpawnWave(CustomWave wave, IReadOnlyList<SpawnPointEntry> points, int maxSpawnCount)
     {
         var assignments = new List<(CustomRole Role, int Count)>();
@@ -247,12 +253,13 @@ public static class RoundStartSpawnManager
         Shuffle(assignments);
 
         var usedPlayers = new HashSet<Player>();
-        var hasSpawnPoints = points.Count > 0;
+        var hasCustomSpawnPoints = points.Count > 0;
         var spawned = 0;
 
         foreach (var (role, count) in assignments)
         {
-            if (spawned >= maxSpawnCount || (hasSpawnPoints && spawned >= points.Count))
+            var managerTeleport = hasCustomSpawnPoints && ShouldManagerTeleport(role);
+            if (spawned >= maxSpawnCount || (managerTeleport && spawned >= points.Count))
                 break;
 
             var remaining = maxSpawnCount - spawned;
@@ -262,13 +269,13 @@ public static class RoundStartSpawnManager
 
             foreach (var player in GetCandidates(role.RoleType, usedPlayers))
             {
-                if (wanted <= 0 || spawned >= maxSpawnCount || (hasSpawnPoints && spawned >= points.Count))
+                if (wanted <= 0 || spawned >= maxSpawnCount || (managerTeleport && spawned >= points.Count))
                     break;
 
                 if (CustomRoleApi.AddRole(player, role.Id) is null)
                     continue;
 
-                if (hasSpawnPoints)
+                if (managerTeleport)
                     points[spawned].Teleport(player);
 
                 usedPlayers.Add(player);
@@ -280,17 +287,18 @@ public static class RoundStartSpawnManager
 
     private static void SpawnRole(CustomRole role, IReadOnlyList<SpawnPointEntry> points, int maxSpawnCount)
     {
-        var hasSpawnPoints = points.Count > 0;
+        var hasCustomSpawnPoints = points.Count > 0;
+        var managerTeleport = hasCustomSpawnPoints && ShouldManagerTeleport(role);
         var spawned = 0;
         foreach (var player in GetCandidates(role.RoleType, null))
         {
-            if (spawned >= maxSpawnCount || (hasSpawnPoints && spawned >= points.Count))
+            if (spawned >= maxSpawnCount || (managerTeleport && spawned >= points.Count))
                 break;
 
             if (CustomRoleApi.AddRole(player, role.Id) is null)
                 continue;
 
-            if (hasSpawnPoints)
+            if (managerTeleport)
                 points[spawned].Teleport(player);
 
             spawned++;
@@ -324,13 +332,13 @@ public static class RoundStartSpawnManager
     private static void WarnUnsupportedProvider(Type type)
     {
         if (WarnedProviderTypes.Add(type))
-            Logger.Warn($"[Astra] {type.FullName} 实现了 ISpawnable，但管理器不支持该内容类型，已跳过。");
+            Logger.Warn($"[Astra] {type.FullName} 实现了 ISpawnDefinition，但管理器不支持该内容类型，已跳过。");
     }
 
-    private static void WarnItemWithoutSpawnPoints(Type type)
+    private static void WarnItemWithoutCustomSpawnPoints(Type type)
     {
         if (WarnedItemWithoutSpawnPointTypes.Add(type))
-            Logger.Warn($"[Astra] {type.FullName} 是物品生成提供者，但 SpawnPoints 为空；物品生成需要至少一个刷怪点，已跳过。");
+            Logger.Warn($"[Astra] {type.FullName} 是物品生成提供者，但 CustomSpawnPoints 为空；物品生成需要至少一个刷新点，已跳过。");
     }
 
     private static void Shuffle<T>(IList<T> items)
