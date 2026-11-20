@@ -6,7 +6,7 @@
 
 基于 LabAPI · 自定义内容 · 托管补丁 · 声明式事件
 
-![Version](https://img.shields.io/badge/version-6.1.0-2ea043)
+![Version](https://img.shields.io/badge/version-7.0.0-2ea043)
 ![Framework](https://img.shields.io/badge/.NET%20Framework-4.8.1-512bd4)
 ![Platform](https://img.shields.io/badge/platform-SCP%3A%20SL%20server-6f42c1)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
@@ -118,7 +118,7 @@ public sealed class ScoutWave : CustomWave
 
 ### 回合开始生成
 
-波次、物品或角色实现 `ISpawnDefinition` 后，`RoundStartSpawnManager` 会在原版角色分配完成后读取刷新点与概率：
+波次、物品或角色实现 `ISpawnOnRoundStart` 后，`RoundStartSpawnManager` 会在原版角色分配完成后读取刷新点与概率：
 
 ```csharp
 using System.Collections.Generic;
@@ -126,7 +126,7 @@ using System.Collections.Generic;
 using Astra.Positions;
 using Astra.Waves;
 
-public sealed class ScoutWave : CustomWave, ISpawnDefinition
+public sealed class ScoutWave : CustomWave, ISpawnOnRoundStart
 {
     public override string Id => "scout_wave";
     public override string Name => "侦察波次";
@@ -147,16 +147,13 @@ public sealed class ScoutWave : CustomWave, ISpawnDefinition
 }
 ```
 
-`StandardRole` 已虚实现 `ISpawnDefinition`：默认 `MinAmount = 0`、`MaxSpawnCount = 0`（不参与管理器的自动生成）、`CustomSpawnPoints` 为空。需要角色在套用后按自己的刷新点出生时，覆写 `CustomSpawnPoints`；`SpawnFlags` 默认 `All` 已包含 `UseSpawnpoint`。需要动态条件时实现 `ISpawnCondition`；`StandardRole` 已实现并默认返回 `true`，管理器在生成前检查，波次中的角色也会逐个检查：
+`StandardRole` 只实现 `ISpawnDefinition`：默认 `CustomSpawnPoints` 为空；它只用这个集合在 `AddRole` 后选点传送，不参与管理器的自动生成，也没有 `MinAmount` / `MaxSpawnCount`。需要参与自动生成的角色应实现 `ISpawnOnRoundStart`。下面是只实现 `ISpawnDefinition` 的 `StandardRole` 示例：
 
 ```csharp
 using System.Collections.Generic;
-using System.Linq;
 
 using Astra.Positions;
 using Astra.Roles;
-
-using LabApi.Features.Wrappers;
 
 using PlayerRoles;
 
@@ -171,13 +168,12 @@ public sealed class ScoutRole : StandardRole
         {
             [SpawnPointEntry.Random()] = 1f,
         };
-
-    public override bool CanSpawnOnRoundStart() =>
-        Player.List.Count(player => player.IsAlive) >= 5;
 }
 ```
 
-`StandardRole.AddRole` 在 `SpawnFlags` 含 `UseSpawnpoint` 时，从 `CustomSpawnPoints` 按概率选一个点并传送；数组为空则不传送。管理器不会覆盖这个选择。只替换与角色 `RoleType` 相同的原版玩家，不改变本回合 SCP 数量；`MinAmount`/`MaxSpawnCount` 控制每次生成的上下限。`CustomSpawnPoints` 为空时角色/波次仍会生成，但不会传送玩家；物品生成仍需要至少一个刷新点。物品实现接口时会在点位置创建原版 `BaseItem`，不会发放到玩家背包。
+`StandardRole.AddRole` 在 `SpawnFlags` 含 `UseSpawnpoint` 时，从 `CustomSpawnPoints` 按概率选一个点并传送；数组为空则不传送。它不会读取 `MinAmount` / `MaxSpawnCount`。`ISpawnOnRoundStart` 的 `MinAmount`/`MaxSpawnCount` 只控制管理器的自动生成；`CustomSpawnPoints` 为空时角色/波次仍会生成，但不会传送玩家，物品生成仍需要至少一个刷新点。物品实现接口时会在点位置创建原版 `BaseItem`，不会发放到玩家背包。
+
+自动生成提供者若还需要动态条件，可同时实现 `ISpawnCondition`，例如（需 `using LabApi.Features.Wrappers;`）：`public bool CanSpawnOnRoundStart() => Player.List.Count(player => player.IsAlive) >= 5;`。管理器会在生成前检查；波次中的角色也会逐个检查。
 
 ### 注册与按来源撤销
 
@@ -285,7 +281,7 @@ tools/                   vsbuild.py、ApiDoc.cs
 
 ## 版本
 
-当前版本：**6.1.0**
+当前版本：**7.0.0**
 
 采用 `MAJOR.MINOR.PATCH`：
 

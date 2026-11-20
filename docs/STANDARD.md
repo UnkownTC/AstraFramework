@@ -3,8 +3,8 @@
 | 项 | 值 |
 |---|---|
 | 状态 | 现行 |
-| 版本基线 | Astra 6.1.0 |
-| 日期 | 2026-11-19 |
+| 版本基线 | Astra 7.0.0 |
+| 日期 | 2026-11-21 |
 | 适用范围 | AstraFramework 仓库（SCP: Secret Laboratory 服务端框架库） |
 | 事实来源 | `src/` 与 `docs/API.md`；两者冲突时以源码为准 |
 | 优先级 | `AGENTS.md` > 本文档 > 代码注释 |
@@ -28,7 +28,7 @@
 | `Astra` | 插件入口、配置、自动注册与共享契约 | `AstraPlugin`、`AutoRegister`、`Config`、`MainManager`、`IIdentifiable`、`ICustomContent` |
 | `Astra.Loader` | 注册顺序与生命周期契约 | `ICallOnRegister`、`ICallOnUnregister`、`IdentifiableManager<T>`、`MonoSingleton<T>` |
 | `Astra.Lifecycle` | 注册来源标识与按来源撤销 | `AstraLifecycle`、`RegistrationSource`、`RegistrationScope` |
-| `Astra.Positions` | 通用位置、刷新点与生成契约 | `PositionEntry`、`SpawnPointEntry`、`ISpawnDefinition`、`ISpawnCondition`、`PositionTeleport` |
+| `Astra.Positions` | 通用位置、刷新点与生成契约 | `PositionEntry`、`SpawnPointEntry`、`ISpawnDefinition`、`ISpawnOnRoundStart`、`ISpawnCondition`、`PositionTeleport` |
 | `Astra.Spawning` | 回合开始生成调度 | `RoundStartSpawnManager` |
 | `Astra.Roles` | 自定义角色 | `CustomRole`、`StandardRole`、`CustomRoleApi`、`RoleEntry`、`IOriginalRole` |
 | `Astra.Teams` | 自定义阵营与阵营关系 | `CustomTeam`、`CustomTeamApi`、`CustomTeamResolver`、`CustomTeamRelation`、`RelationEntry`、`RelationEntryKind`、`TeamRef` |
@@ -105,7 +105,7 @@ src/Astra.Framework/
 | 类别 | 类型 |
 |---|---|
 | 基类 | `CustomRole`、`StandardRole`、`CustomTeam`、`CustomWave`、`CustomItem`、`CustomFirearm`、`CustomMicroHid`、`CustomJailbird`、`CustomParticleDisruptor`、`CustomEffect`、`CustomAbility`、`StandardAbility`、`ServerSpecificSettingBase` |
-| 扩展接口 | `IIdentifiable`、`ICustomContent`、`ICallOnRegister`、`ICallOnUnregister`、`ICustomWaveRoleSpawner`、`ICustomWaveRoleSpawnerV2`、`IWaveSpawnRole`、`IWaveSpawnCountProvider`、`IWaveSorter<T>`、`IWeightedWave`、`IAbilityRole`、`IKeybind`、`ICooldown`、`IPlayerCondition`、`IEffects`、`ICustomHumeShieldStat`、`ICustomHumeShieldBlocker`、`IOriginalRole`、`IManualPatch`、`ISpawnDefinition`、`ISpawnCondition` |
+| 扩展接口 | `IIdentifiable`、`ICustomContent`、`ICallOnRegister`、`ICallOnUnregister`、`ICustomWaveRoleSpawner`、`ICustomWaveRoleSpawnerV2`、`IWaveSpawnRole`、`IWaveSpawnCountProvider`、`IWaveSorter<T>`、`IWeightedWave`、`IAbilityRole`、`IKeybind`、`ICooldown`、`IPlayerCondition`、`IEffects`、`ICustomHumeShieldStat`、`ICustomHumeShieldBlocker`、`IOriginalRole`、`IManualPatch`、`ISpawnDefinition`、`ISpawnOnRoundStart`、`ISpawnCondition` |
 | API 入口 | `CustomRoleApi`、`CustomTeamApi`、`CustomWaveApi`、`CustomItemApi`、`CustomAbilityApi`、`CustomEffectApi`、`CustomHumeShieldApi`、`PatchApi`、`EventApi`、`HintApi`、`AudioApi`、`CountdownApi`、`CancellationTokenApi` |
 | 公共运行时 | `CustomAbilityManager`、`HintManager`、`CountdownManager`、`ServerSpecificSettingManager`、`EventMethodManager`、`CustomEffectController`、`CustomEffectHandler`、`CustomItemEventHandler`、`CustomHumeShieldEventHandler`、`EnhancedEventsHandler`、`RoundStartSpawnManager` |
 | 值对象 / DTO | `EffectEntry`、`ItemEntry`、`RoleEntry`、`WaveSpawnEntry`、`WaveComposition`、`RelationEntry`、`TeamRef`、`CustomTeamRelation`、`PatchStatus`、`EventHandlerStatus`、`RegistrationSource`、`PositionEntry`、`SpawnPointEntry`、`PositionTeleport` |

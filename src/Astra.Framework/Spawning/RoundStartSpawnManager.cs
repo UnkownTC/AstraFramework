@@ -19,7 +19,7 @@ using Logger = LabApi.Features.Console.Logger;
 namespace Astra.Spawning;
 
 /// <summary>
-/// 回合开始生成管理器：在原版角色分配完成后，读取所有 <see cref="ISpawnDefinition"/>，
+/// 回合开始生成管理器：在原版角色分配完成后，读取所有 <see cref="ISpawnOnRoundStart"/>，
 /// 按刷新点概率与生成数量上下限生成波次角色或物品。
 /// </summary>
 /// <remarks>
@@ -39,7 +39,7 @@ namespace Astra.Spawning;
 /// </remarks>
 public static class RoundStartSpawnManager
 {
-    private static readonly List<ISpawnDefinition> ExtraProviders = new();
+    private static readonly List<ISpawnOnRoundStart> ExtraProviders = new();
     private static readonly HashSet<Type> WarnedProviderTypes = new();
     private static readonly HashSet<Type> WarnedItemWithoutSpawnPointTypes = new();
     private static bool _initialized;
@@ -77,7 +77,7 @@ public static class RoundStartSpawnManager
     /// <summary>登记一个额外的生成提供者。</summary>
     /// <param name="provider">生成提供者。</param>
     /// <remarks>重复登记同一实例无副作用；自动注册的内容不需要手动登记。</remarks>
-    public static void Register(ISpawnDefinition provider)
+    public static void Register(ISpawnOnRoundStart provider)
     {
         if (provider is null)
             return;
@@ -89,7 +89,7 @@ public static class RoundStartSpawnManager
     /// <summary>注销一个手动登记的生成提供者。</summary>
     /// <param name="provider">生成提供者。</param>
     /// <returns>确实移除时返回 <see langword="true"/>。</returns>
-    public static bool Unregister(ISpawnDefinition provider) =>
+    public static bool Unregister(ISpawnOnRoundStart provider) =>
         provider is not null && ExtraProviders.Remove(provider);
 
     /// <summary>
@@ -112,9 +112,9 @@ public static class RoundStartSpawnManager
 
     private static void OnPlayersSpawned() => Run();
 
-    private static List<ISpawnDefinition> CollectProviders()
+    private static List<ISpawnOnRoundStart> CollectProviders()
     {
-        var providers = new List<ISpawnDefinition>();
+        var providers = new List<ISpawnOnRoundStart>();
 
         foreach (var provider in ExtraProviders)
             AddProvider(providers, provider);
@@ -131,9 +131,9 @@ public static class RoundStartSpawnManager
         return providers;
     }
 
-    private static void AddProvider(ICollection<ISpawnDefinition> providers, object candidate)
+    private static void AddProvider(ICollection<ISpawnOnRoundStart> providers, object candidate)
     {
-        if (candidate is not ISpawnDefinition provider)
+        if (candidate is not ISpawnOnRoundStart provider)
             return;
 
         if (providers.Any(existing => ReferenceEquals(existing, provider)))
@@ -142,7 +142,7 @@ public static class RoundStartSpawnManager
         providers.Add(provider);
     }
 
-    private static void Spawn(ISpawnDefinition provider)
+    private static void Spawn(ISpawnOnRoundStart provider)
     {
         if (provider is ISpawnCondition condition && !condition.CanSpawnOnRoundStart())
             return;
@@ -338,7 +338,7 @@ public static class RoundStartSpawnManager
     private static void WarnUnsupportedProvider(Type type)
     {
         if (WarnedProviderTypes.Add(type))
-            Logger.Warn($"[Astra] {type.FullName} 实现了 ISpawnDefinition，但管理器不支持该内容类型，已跳过。");
+            Logger.Warn($"[Astra] {type.FullName} 实现了 ISpawnOnRoundStart，但管理器不支持该内容类型，已跳过。");
     }
 
     private static void WarnItemWithoutCustomSpawnPoints(Type type)

@@ -3,14 +3,13 @@ using System.Collections.Generic;
 namespace Astra.Positions;
 
 /// <summary>
-/// 表示带自定义刷新点与生成数量的内容定义（角色、波次或物品）。
+/// 表示带自定义刷新点的内容定义（角色、波次或物品）。
 /// </summary>
 /// <remarks>
 /// <para>
-/// 本接口只声明生成数据，不规定生成什么实体：<c>Astra.Spawning.RoundStartSpawnManager</c>
-/// 会在原版角色分配完成后读取它，按概率与数量上下限生成波次/物品；
-/// <see cref="Astra.Roles.StandardRole"/> 也会用 <see cref="CustomSpawnPoints"/>
-/// 在套用角色后选择出生点。
+/// 本接口只声明刷新点，不规定生成数量或生成实体：<see cref="Astra.Roles.StandardRole"/>
+/// 会用 <see cref="CustomSpawnPoints"/> 在套用角色后选择出生点；回合开始自动生成由
+/// <see cref="ISpawnOnRoundStart"/> 表示。
 /// </para>
 /// <para>
 /// <see cref="CustomSpawnPoints"/> 为空表示「允许生成，但不进行传送」。角色/波次会保留
@@ -19,24 +18,6 @@ namespace Astra.Positions;
 /// </remarks>
 public interface ISpawnDefinition
 {
-    /// <summary>
-    /// 单次生成的最少实体数量。
-    /// </summary>
-    /// <remarks>
-    /// 小于等于 <c>0</c> 表示不设下限；管理器会尽量补足到该数量，但受
-    /// <see cref="MaxSpawnCount"/>、可用刷新点与可用玩家限制。
-    /// </remarks>
-    int MinAmount { get; }
-
-    /// <summary>
-    /// 单次生成的最多实体数量。
-    /// </summary>
-    /// <remarks>
-    /// 对波次/角色实现表示最多处理的玩家数，对物品实现表示最多生成的物品数；
-    /// 小于等于 <c>0</c> 表示不生成，<see cref="int.MaxValue"/> 表示不限制。
-    /// </remarks>
-    int MaxSpawnCount { get; }
-
     /// <summary>
     /// 自定义刷新点与对应的生成概率。
     /// </summary>

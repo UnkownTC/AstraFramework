@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `6.1.0`（`Directory.Build.props`） |
+| 适用版本 | `7.0.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -99,8 +99,9 @@ _scope.Dispose();
 | 自定义波次 | `CustomWave`（`Id` / `Name` / `Teams`：`IReadOnlyList<TeamRef>`）；角色侧实现 `IWaveSpawnRole` 声明归属与默认数量，波次可用 `Spawns`（`WaveSpawnEntry`）额外声明 / 覆盖刷新项 | 宿主注册生成器 `ICustomWaveRoleSpawner`（`SetRoleSpawner`）或 `ICustomWaveRoleSpawnerV2`（`AddRoleSpawner`）；执行 `CustomWaveApi.Spawn`；加权调度用 `WaveScheduler` | `Roles` / `Table` 用 `RoleEntry`（原版 + 自定义可混编）；角色可用 `IWaveSpawnCountProvider` 按波次声明数量；波次实现 `IWeightedWave` 后 `WaveScheduler.Load/Advance` 按权重与人数门槛推进；主阵营读 `Team`（`TeamRef`）；无生成器时原版角色由框架直接套用、自定义角色会失败；支援池用 `SupportWavePool`（Register / SetWeight / Pick / GetWithFallback）；原版波次标记用 `VanillaWaveDispatch` / `VanillaWaveAdapter`；`CustomWaveApi.Spawn(id, players)` 可直接执行 |
 | 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火；装备 / 拾取 / 使用 / 投掷 / 换弹 / 瞄准 / 命中均有可覆写钩子 |
 | 刷怪点 / 位置 | `PositionEntry` / `SpawnPointEntry` / `ISpawnDefinition` | 构造 `PositionEntry.Find(Vector3)` / `Find(RoomIdentifier, local)` / `Find(RoomName/Zone/Shape/组合, local)` / `Random(local)`；`SpawnPointEntry.Find(...)` / `Random(...)`；解析 `TryGetWorldPosition` / `TryResolve`；传送 `Teleport(player)` 或 `player.Teleport(entry)` | 精确世界坐标或具体房间稳定；只给筛选条件时解析阶段随机选房；未指定旋转时 `TryResolve` 返回随机水平朝向；具体房间引用失效时回退到筛选条件重新选房；`PositionEntry.Teleport` 不修改朝向，`SpawnPointEntry.Teleport` 同时应用旋转 |
-| 回合开始生成 | `ISpawnDefinition` | 实现 `MinAmount` / `MaxSpawnCount` / `CustomSpawnPoints`；`CustomWave` / `CustomItem` / `CustomRole` 自动被 `RoundStartSpawnManager` 收集，其他类型用 `Register` 手动登记；`StandardRole` 已虚实现 | 在原版 `RoleAssigner.OnPlayersSpawned` 后执行，不改变本回合 SCP 数量；每个点的概率独立判定（0~1，≤0 跳过、≥1 必中）；`MinAmount` 不足时从有效未命中点补足，`MaxSpawnCount` 限制上限；`CustomSpawnPoints` 为空时角色/波次仍生成但不传送，物品仍需至少一个点；`StandardRole` 默认 `MaxSpawnCount=0`，需要参与自动生成时覆写；`SpawnFlags` 含 `UseSpawnpoint` 时由 `StandardRole.AddRole` 选点传送，管理器不覆盖 |
-| 回合开始生成条件 | `ISpawnCondition` | 实现 `CanSpawnOnRoundStart()`；`StandardRole` 已虚实现，默认 `true` | 管理器在生成前调用，返回 `false` 时本次跳过；波次中的角色也会逐个检查；只影响自动生成，不影响手动 `AddRole` |
+| 刷新点定义 | `ISpawnDefinition` | 只声明 `CustomSpawnPoints`；`StandardRole` 用它选择出生点 | 不规定生成数量或实体；`CustomSpawnPoints` 为空表示允许生成但不传送；物品仍需要至少一个刷新点 |
+| 回合开始生成 | `ISpawnOnRoundStart`（继承 `ISpawnDefinition`） | 实现 `MinAmount` / `MaxSpawnCount` / `CustomSpawnPoints`；`CustomWave` / `CustomItem` / `CustomRole` 自动被 `RoundStartSpawnManager` 收集，其他类型用 `Register` 手动登记 | 在原版 `RoleAssigner.OnPlayersSpawned` 后执行，不改变本回合 SCP 数量；每个点的概率独立判定（0~1，≤0 跳过、≥1 必中）；`MinAmount` 不足时从有效未命中点补足，`MaxSpawnCount` 限制上限；`CustomSpawnPoints` 为空时角色/波次仍生成但不传送，物品仍需至少一个点；`StandardRole` 不参与自动生成 |
+| 回合开始生成条件 | `ISpawnCondition` | 实现 `CanSpawnOnRoundStart()`；自动生成的提供者可选用 | 管理器在生成前调用，返回 `false` 时本次跳过；波次中的角色也会逐个检查；只影响自动生成，不影响手动 `AddRole` |
 | 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明；`CanStack = true` 时同类效果经 `CustomEffectController.AddEffect` 叠加层数（强度 ×层数、时长累加） |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
 | 休谟护盾 | `ICustomHumeShieldStat`（`StandardRole` 已实现） | 随角色套用自动接管生灭 | `HumeShieldCurve` 非空时以曲线为准 |
@@ -131,7 +132,7 @@ _scope.Dispose();
 
 > 本节由 `tools/ApiDoc.cs` 扫描 `src/Astra.Framework/**/*.cs` 生成，**请勿手改**；改动公开签名后重新生成。
 
-- **统计**：公开类型 116 个（class 77 / enum 8 / interface 21 / struct 10），命名空间 23 个；公开成员 793 个。
+- **统计**：公开类型 117 个（class 77 / enum 8 / interface 22 / struct 10），命名空间 23 个；公开成员 790 个。
 - **口径**：`public` 与 `protected` 成员均属对外 API（后者可被子类使用）；`internal` / `private` / `file` / `private protected` 不收录。
 
 ### 命名空间索引
@@ -155,7 +156,7 @@ _scope.Dispose();
 | `Astra.Lifecycle` | `AstraLifecycle`、`RegistrationScope`、`RegistrationSource` |
 | `Astra.Loader` | `ICallOnRegister`、`ICallOnUnregister`、`IdentifiableManager<T>`、`MonoSingleton<T>` |
 | `Astra.Patching` | `IManualPatch`、`PatchApi`、`PatchStatus` |
-| `Astra.Positions` | `ISpawnCondition`、`ISpawnDefinition`、`PositionEntry`、`PositionTeleport`、`SpawnPointEntry` |
+| `Astra.Positions` | `ISpawnCondition`、`ISpawnDefinition`、`ISpawnOnRoundStart`、`PositionEntry`、`PositionTeleport`、`SpawnPointEntry` |
 | `Astra.Roles` | `CustomRole`、`CustomRoleApi`、`IOriginalRole`、`RoleEntry`、`StandardRole` |
 | `Astra.ServerSpecificSettings` | `ServerSpecificSettingBase`、`ServerSpecificSettingManager` |
 | `Astra.Spawning` | `RoundStartSpawnManager` |
@@ -1489,11 +1490,20 @@ _scope.Dispose();
 
 源码：`src/Astra.Framework/Positions/ISpawnDefinition.cs`
 
-> 表示带自定义刷新点与生成数量的内容定义（角色、波次或物品）。
+> 表示带自定义刷新点的内容定义（角色、波次或物品）。
+
+- `IReadOnlyDictionary<SpawnPointEntry, float> CustomSpawnPoints { get; }` — 自定义刷新点与对应的生成概率。
+
+#### `ISpawnOnRoundStart`
+
+`public interface ISpawnOnRoundStart : ISpawnDefinition`
+
+源码：`src/Astra.Framework/Positions/ISpawnOnRoundStart.cs`
+
+> 回合开始自动生成契约：在 ISpawnDefinition 的刷新点基础上增加生成数量上下限。
 
 - `int MinAmount { get; }` — 单次生成的最少实体数量。
 - `int MaxSpawnCount { get; }` — 单次生成的最多实体数量。
-- `IReadOnlyDictionary<SpawnPointEntry, float> CustomSpawnPoints { get; }` — 自定义刷新点与对应的生成概率。
 
 #### `PositionEntry`
 
@@ -1642,12 +1652,10 @@ _scope.Dispose();
 
 #### `StandardRole`
 
-`public abstract class StandardRole : CustomRole, IAbilityRole, ICustomHumeShieldStat, IEffects, ISpawnDefinition, ISpawnCondition`
+`public abstract class StandardRole : CustomRole, IAbilityRole, ICustomHumeShieldStat, IEffects, ISpawnDefinition`
 
 源码：`src/Astra.Framework/Roles/StandardRole.cs`
 
-- `public virtual int MinAmount { get; }`
-- `public virtual int MaxSpawnCount { get; }`
 - `public virtual IReadOnlyDictionary<SpawnPointEntry, float> CustomSpawnPoints { get; }`
 - `public virtual CustomAbility[] Abilities { get; }`
 - `public virtual float MaxHumeShield { get; set; }` — 护盾上限；HumeShieldCurve 非空时以曲线为准。
@@ -1655,7 +1663,6 @@ _scope.Dispose();
 - `public virtual float HumeShieldRegenRate { get; set; }` — 每秒恢复量。
 - `public virtual float HumeShieldRegenDelay { get; set; }` — 受伤后延迟多少秒开始恢复。
 - `public virtual EffectEntry[] Effects { get; }` — 套用角色时一并施加的效果集合，原版效果与自定义效果可混用。
-- `public virtual bool CanSpawnOnRoundStart()` — 默认允许回合开始自动生成；需要按人数/阵营等条件限制时覆写。
 
 
 ### `Astra.ServerSpecificSettings`
@@ -1693,13 +1700,13 @@ _scope.Dispose();
 
 源码：`src/Astra.Framework/Spawning/RoundStartSpawnManager.cs`
 
-> 回合开始生成管理器：在原版角色分配完成后，读取所有 ISpawnDefinition， 按刷新点概率与生成数量上下限生成波次角色或物品。
+> 回合开始生成管理器：在原版角色分配完成后，读取所有 ISpawnOnRoundStart， 按刷新点概率与生成数量上下限生成波次角色或物品。
 
 - `public static bool IsInitialized { get; }` — 管理器是否已订阅回合开始事件。
 - `public static void Initialize()` — 订阅原版角色分配完成事件；由框架在自动注册完成后调用，重复调用无副作用。
 - `public static void Shutdown()` — 取消订阅并清空手动登记的提供者；由框架在禁用时调用。
-- `public static void Register(ISpawnDefinition provider)` — 登记一个额外的生成提供者。
-- `public static bool Unregister(ISpawnDefinition provider)` — 注销一个手动登记的生成提供者。
+- `public static void Register(ISpawnOnRoundStart provider)` — 登记一个额外的生成提供者。
+- `public static bool Unregister(ISpawnOnRoundStart provider)` — 注销一个手动登记的生成提供者。
 - `public static void Run()` — 立即执行一次回合开始生成；主要用于手动触发或测试。
 
 

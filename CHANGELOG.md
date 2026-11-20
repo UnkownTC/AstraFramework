@@ -2,6 +2,15 @@
 
 本项目的重要变更记录。版本号遵循 `MAJOR.MINOR.PATCH`。
 
+## [7.0.0] - 2026-11-21
+
+### Changed
+
+- **BREAKING**：`ISpawnDefinition` 只保留 `CustomSpawnPoints`；`MinAmount` / `MaxSpawnCount` 拆分到新的 `ISpawnOnRoundStart : ISpawnDefinition`。
+- **BREAKING**：`StandardRole` 不再实现 `ISpawnCondition`，删除 `CanSpawnOnRoundStart`、`MinAmount`、`MaxSpawnCount`；它只用 `CustomSpawnPoints` 在 `AddRole` 后选点传送，不参与自动生成。
+- `RoundStartSpawnManager` 只收集 `ISpawnOnRoundStart`；仅实现 `ISpawnDefinition` 的 `StandardRole` 不参与回合开始自动生成。需要条件时由自动生成提供者额外实现 `ISpawnCondition`。
+- 版本升至 7.0.0。
+
 ## [6.1.0] - 2026-11-20
 
 ### Added
