@@ -144,6 +144,9 @@ public static class RoundStartSpawnManager
 
     private static void Spawn(ISpawnDefinition provider)
     {
+        if (provider is ISpawnCondition condition && !condition.CanSpawnOnRoundStart())
+            return;
+
         var maxSpawnCount = provider.MaxSpawnCount;
         if (maxSpawnCount <= 0)
             return;
@@ -242,6 +245,9 @@ public static class RoundStartSpawnManager
         {
             var role = pair.Key.ResolveCustom();
             if (role is null || pair.Value == 0)
+                continue;
+
+            if (role is ISpawnCondition roleCondition && !roleCondition.CanSpawnOnRoundStart())
                 continue;
 
             assignments.Add((role, pair.Value));

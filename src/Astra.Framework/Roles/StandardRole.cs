@@ -15,7 +15,7 @@ using UnityEngine;
 
 namespace Astra.Roles;
 
-public abstract class StandardRole : CustomRole, IAbilityRole, ICustomHumeShieldStat, IEffects, ISpawnDefinition
+public abstract class StandardRole : CustomRole, IAbilityRole, ICustomHumeShieldStat, IEffects, ISpawnDefinition, ISpawnCondition
 {
     /// <inheritdoc />
     public virtual int MinAmount => 0;
@@ -26,6 +26,9 @@ public abstract class StandardRole : CustomRole, IAbilityRole, ICustomHumeShield
     /// <inheritdoc />
     public virtual IReadOnlyDictionary<SpawnPointEntry, float> CustomSpawnPoints { get; } =
         new Dictionary<SpawnPointEntry, float>();
+
+    /// <summary>默认允许回合开始自动生成；需要按人数/阵营等条件限制时覆写。</summary>
+    public virtual bool CanSpawnOnRoundStart() => true;
     public virtual CustomAbility[] Abilities { get; } = [];
 
     /// <summary>护盾上限；<see cref="HumeShieldCurve"/> 非空时以曲线为准。</summary>

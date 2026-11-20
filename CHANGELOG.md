@@ -2,6 +2,13 @@
 
 本项目的重要变更记录。版本号遵循 `MAJOR.MINOR.PATCH`。
 
+## [6.1.0] - 2026-11-20
+
+### Added
+
+- 新增 `ISpawnCondition`，提供 `CanSpawnOnRoundStart()`；`RoundStartSpawnManager` 在生成前检查，波次中的角色也会逐个检查。
+- `StandardRole` 虚实现 `ISpawnCondition`，默认返回 `true`；可按在线人数/阵营等条件覆写。
+
 ## [6.0.0] - 2026-11-20
 
 ### Changed

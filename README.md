@@ -6,7 +6,7 @@
 
 基于 LabAPI · 自定义内容 · 托管补丁 · 声明式事件
 
-![Version](https://img.shields.io/badge/version-6.0.0-2ea043)
+![Version](https://img.shields.io/badge/version-6.1.0-2ea043)
 ![Framework](https://img.shields.io/badge/.NET%20Framework-4.8.1-512bd4)
 ![Platform](https://img.shields.io/badge/platform-SCP%3A%20SL%20server-6f42c1)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
@@ -147,13 +147,16 @@ public sealed class ScoutWave : CustomWave, ISpawnDefinition
 }
 ```
 
-`StandardRole` 已虚实现 `ISpawnDefinition`：默认 `MinAmount = 0`、`MaxSpawnCount = 0`（不参与管理器的自动生成）、`CustomSpawnPoints` 为空。需要角色在套用后按自己的刷新点出生时，覆写 `CustomSpawnPoints`；`SpawnFlags` 默认 `All` 已包含 `UseSpawnpoint`：
+`StandardRole` 已虚实现 `ISpawnDefinition`：默认 `MinAmount = 0`、`MaxSpawnCount = 0`（不参与管理器的自动生成）、`CustomSpawnPoints` 为空。需要角色在套用后按自己的刷新点出生时，覆写 `CustomSpawnPoints`；`SpawnFlags` 默认 `All` 已包含 `UseSpawnpoint`。需要动态条件时实现 `ISpawnCondition`；`StandardRole` 已实现并默认返回 `true`，管理器在生成前检查，波次中的角色也会逐个检查：
 
 ```csharp
 using System.Collections.Generic;
+using System.Linq;
 
 using Astra.Positions;
 using Astra.Roles;
+
+using LabApi.Features.Wrappers;
 
 using PlayerRoles;
 
@@ -168,6 +171,9 @@ public sealed class ScoutRole : StandardRole
         {
             [SpawnPointEntry.Random()] = 1f,
         };
+
+    public override bool CanSpawnOnRoundStart() =>
+        Player.List.Count(player => player.IsAlive) >= 5;
 }
 ```
 
@@ -279,7 +285,7 @@ tools/                   vsbuild.py、ApiDoc.cs
 
 ## 版本
 
-当前版本：**6.0.0**
+当前版本：**6.1.0**
 
 采用 `MAJOR.MINOR.PATCH`：
 
