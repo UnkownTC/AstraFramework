@@ -6,7 +6,7 @@
 
 基于 LabAPI · 自定义内容 · 托管补丁 · 声明式事件
 
-![Version](https://img.shields.io/badge/version-4.0.1-2ea043)
+![Version](https://img.shields.io/badge/version-5.0.0-2ea043)
 ![Framework](https://img.shields.io/badge/.NET%20Framework-4.8.1-512bd4)
 ![Platform](https://img.shields.io/badge/platform-SCP%3A%20SL%20server-6f42c1)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
@@ -118,7 +118,7 @@ public sealed class ScoutWave : CustomWave
 
 ### 回合开始生成
 
-波次、角色或物品实现 `ISpawnOnRoundStart` 后，`RoundStartSpawnManager` 会在原版角色分配完成后读取刷新点与概率：
+波次、角色或物品实现 `ISpawnable` 后，`RoundStartSpawnManager` 会在原版角色分配完成后读取刷新点与概率：
 
 ```csharp
 using System.Collections.Generic;
@@ -126,7 +126,7 @@ using System.Collections.Generic;
 using Astra.Positions;
 using Astra.Waves;
 
-public sealed class ScoutWave : CustomWave, ISpawnOnRoundStart
+public sealed class ScoutWave : CustomWave, ISpawnable
 {
     public override string Id => "scout_wave";
     public override string Name => "侦察波次";
@@ -136,6 +136,8 @@ public sealed class ScoutWave : CustomWave, ISpawnOnRoundStart
         WaveSpawnEntry.Custom("scout", 2),
     ];
 
+    public bool SpawnOnRoundStart => true;
+    public int MinAmount => 1;
     public int MaxSpawnCount => 2;
 
     public IReadOnlyDictionary<SpawnPointEntry, float> SpawnPoints { get; } =
@@ -146,7 +148,7 @@ public sealed class ScoutWave : CustomWave, ISpawnOnRoundStart
 }
 ```
 
-只替换与角色 `RoleType` 相同的原版玩家，不改变本回合 SCP 数量；`MaxSpawnCount` 限制每次最多生成数。物品实现接口时会在点位置创建原版 `BaseItem`，不会发放到玩家背包。
+只替换与角色 `RoleType` 相同的原版玩家，不改变本回合 SCP 数量；`MinAmount`/`MaxSpawnCount` 控制每次生成的上下限。`SpawnPoints` 为空时角色/波次仍会生成，但不会传送玩家；物品生成仍需要至少一个刷怪点。物品实现接口时会在点位置创建原版 `BaseItem`，不会发放到玩家背包。
 
 ### 注册与按来源撤销
 
@@ -254,7 +256,7 @@ tools/                   vsbuild.py、ApiDoc.cs
 
 ## 版本
 
-当前版本：**4.0.1**
+当前版本：**5.0.0**
 
 采用 `MAJOR.MINOR.PATCH`：
 

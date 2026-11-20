@@ -2,6 +2,16 @@
 
 本项目的重要变更记录。版本号遵循 `MAJOR.MINOR.PATCH`。
 
+## [5.0.0] - 2026-11-20
+
+### Changed
+
+- **BREAKING**：`ISpawnOnRoundStart` 更名为 `ISpawnable`，并新增 `SpawnOnRoundStart`、`MinAmount` 成员；实现方必须补充这两个属性。
+- `SpawnOnRoundStart` 默认应为 `false`；`RoundStartSpawnManager` 只执行显式返回 `true` 的提供者。
+- `SpawnPoints` 为空时，角色/波次仍允许生成，但不进行传送；物品生成仍需要至少一个刷怪点。
+- `MinAmount` 控制单次生成的最少数量；概率未选够时会从有效但未命中的刷怪点中补足，最多到 `MaxSpawnCount`。
+- 版本升至 5.0.0。
+
 ## [4.0.1] - 2026-11-19
 
 ### Fixed
