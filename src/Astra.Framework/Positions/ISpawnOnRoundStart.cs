@@ -21,7 +21,7 @@ public interface ISpawnOnRoundStart : ISpawnDefinition
     /// 小于等于 <c>0</c> 表示不设下限；管理器会尽量补足到该数量，但受
     /// <see cref="MaxSpawnCount"/>、可用刷新点与可用玩家限制。
     /// </remarks>
-    int MinAmount { get; }
+    int MinSpawnCount { get; }
 
     /// <summary>
     /// 单次生成的最多实体数量。

@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 适用版本 | `7.0.0`（`Directory.Build.props`） |
+| 适用版本 | `8.0.0`（`Directory.Build.props`） |
 | 面向 | 写业务插件的人；改框架公开签名的人 |
 | 事实来源 | §3 由 `tools/ApiDoc.cs` 扫描源码生成；§1、§2 手写，与源码冲突时以源码为准 |
 
@@ -100,7 +100,7 @@ _scope.Dispose();
 | 自定义物品 | `CustomItem`（`Id` / `Name` / `BaseItem`），或 `CustomFirearm` / `CustomMicroHid` / `CustomJailbird` / `CustomParticleDisruptor` | 发放 `CustomItemApi.Give<T>(player)` 或 `Give(player, id)`；查询 `Find` / `FindByItem` | 复用原版 `ItemType`，同一 `BaseItem` 只能注册一个自定义物品（重复注册告警并跳过）；射击默认不介入，只有覆写 `OnShooting` 的物品才算接管开火；装备 / 拾取 / 使用 / 投掷 / 换弹 / 瞄准 / 命中均有可覆写钩子 |
 | 刷怪点 / 位置 | `PositionEntry` / `SpawnPointEntry` / `ISpawnDefinition` | 构造 `PositionEntry.Find(Vector3)` / `Find(RoomIdentifier, local)` / `Find(RoomName/Zone/Shape/组合, local)` / `Random(local)`；`SpawnPointEntry.Find(...)` / `Random(...)`；解析 `TryGetWorldPosition` / `TryResolve`；传送 `Teleport(player)` 或 `player.Teleport(entry)` | 精确世界坐标或具体房间稳定；只给筛选条件时解析阶段随机选房；未指定旋转时 `TryResolve` 返回随机水平朝向；具体房间引用失效时回退到筛选条件重新选房；`PositionEntry.Teleport` 不修改朝向，`SpawnPointEntry.Teleport` 同时应用旋转 |
 | 刷新点定义 | `ISpawnDefinition` | 只声明 `CustomSpawnPoints`；`StandardRole` 用它选择出生点 | 不规定生成数量或实体；`CustomSpawnPoints` 为空表示允许生成但不传送；物品仍需要至少一个刷新点 |
-| 回合开始生成 | `ISpawnOnRoundStart`（继承 `ISpawnDefinition`） | 实现 `MinAmount` / `MaxSpawnCount` / `CustomSpawnPoints`；`CustomWave` / `CustomItem` / `CustomRole` 自动被 `RoundStartSpawnManager` 收集，其他类型用 `Register` 手动登记 | 在原版 `RoleAssigner.OnPlayersSpawned` 后执行，不改变本回合 SCP 数量；每个点的概率独立判定（0~1，≤0 跳过、≥1 必中）；`MinAmount` 不足时从有效未命中点补足，`MaxSpawnCount` 限制上限；`CustomSpawnPoints` 为空时角色/波次仍生成但不传送，物品仍需至少一个点；`StandardRole` 不参与自动生成 |
+| 回合开始生成 | `ISpawnOnRoundStart`（继承 `ISpawnDefinition`） | 实现 `MinSpawnCount` / `MaxSpawnCount` / `CustomSpawnPoints`；`CustomWave` / `CustomItem` / `CustomRole` 自动被 `RoundStartSpawnManager` 收集，其他类型用 `Register` 手动登记 | 在原版 `RoleAssigner.OnPlayersSpawned` 后执行，不改变本回合 SCP 数量；每个点的概率独立判定（0~1，≤0 跳过、≥1 必中）；`MinSpawnCount` 不足时从有效未命中点补足，`MaxSpawnCount` 限制上限；`CustomSpawnPoints` 为空时角色/波次仍生成但不传送，物品仍需至少一个点；`StandardRole` 不参与自动生成 |
 | 回合开始生成条件 | `ISpawnCondition` | 实现 `CanSpawnOnRoundStart()`；自动生成的提供者可选用 | 管理器在生成前调用，返回 `false` 时本次跳过；波次中的角色也会逐个检查；只影响自动生成，不影响手动 `AddRole` |
 | 状态效果 | `CustomEffect`（需 `(Player)` 公开构造，或用工厂重载） | 声明 `EffectEntry.Vanilla(...)` / `EffectEntry.Custom<T>(...)`；施加与移除 `CustomEffectApi.Apply` / `Remove` | 原版效果与自定义效果共用同一套 `EffectEntry` 声明；`CanStack = true` 时同类效果经 `CustomEffectController.AddEffect` 叠加层数（强度 ×层数、时长累加） |
 | 自定义技能 | `CustomAbility`；需按键 / 冷却 / 条件契约时叠加 `IKeybind` / `ICooldown` / `IPlayerCondition`；标准实现为 `StandardAbility` | 角色侧通过 `IAbilityRole.Abilities` 声明（`StandardRole` 已实现）；玩家侧 `CustomAbilityManager.AddAbility`（`player.TryGetAbilityManager`）；查询 `CustomAbilityApi` | 模板按 Id 注册，每个玩家一份管理器实例 |
@@ -1502,7 +1502,7 @@ _scope.Dispose();
 
 > 回合开始自动生成契约：在 ISpawnDefinition 的刷新点基础上增加生成数量上下限。
 
-- `int MinAmount { get; }` — 单次生成的最少实体数量。
+- `int MinSpawnCount { get; }` — 单次生成的最少实体数量。
 - `int MaxSpawnCount { get; }` — 单次生成的最多实体数量。
 
 #### `PositionEntry`

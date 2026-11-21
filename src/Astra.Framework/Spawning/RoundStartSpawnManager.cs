@@ -151,13 +151,13 @@ public static class RoundStartSpawnManager
         if (maxSpawnCount <= 0)
             return;
 
-        var minAmount = Math.Max(0, provider.MinAmount);
-        if (minAmount > maxSpawnCount)
-            minAmount = maxSpawnCount;
+        var minSpawnCount = Math.Max(0, provider.MinSpawnCount);
+        if (minSpawnCount > maxSpawnCount)
+            minSpawnCount = maxSpawnCount;
 
         var spawnPoints = provider.CustomSpawnPoints;
         var hasCustomSpawnPoints = spawnPoints is { Count: > 0 };
-        var points = SelectPoints(spawnPoints, maxSpawnCount, minAmount);
+        var points = SelectPoints(spawnPoints, maxSpawnCount, minSpawnCount);
 
         // 非空刷新点全部未通过概率判定时，本次不生成；空字典表示允许无传送生成。
         if (hasCustomSpawnPoints && points.Count == 0)
@@ -190,7 +190,7 @@ public static class RoundStartSpawnManager
     }
 
     private static List<SpawnPointEntry> SelectPoints(
-        IReadOnlyDictionary<SpawnPointEntry, float>? spawnPoints, int maxSpawnCount, int minAmount)
+        IReadOnlyDictionary<SpawnPointEntry, float>? spawnPoints, int maxSpawnCount, int minSpawnCount)
     {
         var selected = new List<SpawnPointEntry>();
         var unselected = new List<SpawnPointEntry>();
@@ -212,8 +212,8 @@ public static class RoundStartSpawnManager
 
         Shuffle(selected);
 
-        // MinAmount 是下限：概率未选够时，从有效但未命中的点中补足，最多到 MaxSpawnCount。
-        var targetMin = Math.Min(minAmount, maxSpawnCount);
+        // MinSpawnCount 是下限：概率未选够时，从有效但未命中的点中补足，最多到 MaxSpawnCount。
+        var targetMin = Math.Min(minSpawnCount, maxSpawnCount);
         if (selected.Count < targetMin)
         {
             Shuffle(unselected);
@@ -278,6 +278,10 @@ public static class RoundStartSpawnManager
                 if (wanted <= 0 || spawned >= maxSpawnCount || (managerTeleport && spawned >= points.Count))
                     break;
 
+                // 分配前再次确认：若该玩家已在本轮其他 provider 中拿到 CustomRole，跳过并按原条件继续筛选下一位。
+                if (HasCustomRole(player))
+                    continue;
+
                 if (CustomRoleApi.AddRole(player, role.Id) is null)
                     continue;
 
@@ -300,6 +304,10 @@ public static class RoundStartSpawnManager
         {
             if (spawned >= maxSpawnCount || (managerTeleport && spawned >= points.Count))
                 break;
+
+            // 分配前再次确认：已有 CustomRole 的玩家不作为候选，继续按相同条件筛选。
+            if (HasCustomRole(player))
+                continue;
 
             if (CustomRoleApi.AddRole(player, role.Id) is null)
                 continue;
@@ -330,10 +338,12 @@ public static class RoundStartSpawnManager
         return Player.List
             .Where(player => excluded is null || !excluded.Contains(player))
             .Where(player => player.ReferenceHub.IsAlive())
-            .Where(player => CustomRoleApi.GetRole(player) is null)
+            .Where(player => !HasCustomRole(player))
             .Where(player => roleType == RoleTypeId.None || player.Role == roleType)
             .ToList();
     }
+
+    private static bool HasCustomRole(Player player) => CustomRoleApi.GetRole(player) is not null;
 
     private static void WarnUnsupportedProvider(Type type)
     {

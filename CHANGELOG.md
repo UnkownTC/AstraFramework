@@ -2,6 +2,16 @@
 
 本项目的重要变更记录。版本号遵循 `MAJOR.MINOR.PATCH`。
 
+## [8.0.0] - 2026-11-22
+
+### Changed
+
+- **BREAKING**：`ISpawnOnRoundStart.MinAmount` 重命名为 `MinSpawnCount`，语义不变。
+
+### Fixed
+
+- 回合开始生成在分配自定义角色前再次检查玩家是否已持有 `CustomRole`；已有则跳过，并按相同条件继续筛选后续候选玩家。
+
 ## [7.0.0] - 2026-11-21
 
 ### Changed

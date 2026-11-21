@@ -6,7 +6,7 @@
 
 基于 LabAPI · 自定义内容 · 托管补丁 · 声明式事件
 
-![Version](https://img.shields.io/badge/version-7.0.0-2ea043)
+![Version](https://img.shields.io/badge/version-8.0.0-2ea043)
 ![Framework](https://img.shields.io/badge/.NET%20Framework-4.8.1-512bd4)
 ![Platform](https://img.shields.io/badge/platform-SCP%3A%20SL%20server-6f42c1)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
@@ -136,7 +136,7 @@ public sealed class ScoutWave : CustomWave, ISpawnOnRoundStart
         WaveSpawnEntry.Custom("scout", 2),
     ];
 
-    public int MinAmount => 1;
+    public int MinSpawnCount => 1;
     public int MaxSpawnCount => 2;
 
     public IReadOnlyDictionary<SpawnPointEntry, float> CustomSpawnPoints { get; } =
@@ -147,7 +147,7 @@ public sealed class ScoutWave : CustomWave, ISpawnOnRoundStart
 }
 ```
 
-`StandardRole` 只实现 `ISpawnDefinition`：默认 `CustomSpawnPoints` 为空；它只用这个集合在 `AddRole` 后选点传送，不参与管理器的自动生成，也没有 `MinAmount` / `MaxSpawnCount`。需要参与自动生成的角色应实现 `ISpawnOnRoundStart`。下面是只实现 `ISpawnDefinition` 的 `StandardRole` 示例：
+`StandardRole` 只实现 `ISpawnDefinition`：默认 `CustomSpawnPoints` 为空；它只用这个集合在 `AddRole` 后选点传送，不参与管理器的自动生成，也没有 `MinSpawnCount` / `MaxSpawnCount`。需要参与自动生成的角色应实现 `ISpawnOnRoundStart`。下面是只实现 `ISpawnDefinition` 的 `StandardRole` 示例：
 
 ```csharp
 using System.Collections.Generic;
@@ -171,7 +171,7 @@ public sealed class ScoutRole : StandardRole
 }
 ```
 
-`StandardRole.AddRole` 在 `SpawnFlags` 含 `UseSpawnpoint` 时，从 `CustomSpawnPoints` 按概率选一个点并传送；数组为空则不传送。它不会读取 `MinAmount` / `MaxSpawnCount`。`ISpawnOnRoundStart` 的 `MinAmount`/`MaxSpawnCount` 只控制管理器的自动生成；`CustomSpawnPoints` 为空时角色/波次仍会生成，但不会传送玩家，物品生成仍需要至少一个刷新点。物品实现接口时会在点位置创建原版 `BaseItem`，不会发放到玩家背包。
+`StandardRole.AddRole` 在 `SpawnFlags` 含 `UseSpawnpoint` 时，从 `CustomSpawnPoints` 按概率选一个点并传送；数组为空则不传送。它不会读取 `MinSpawnCount` / `MaxSpawnCount`。`ISpawnOnRoundStart` 的 `MinSpawnCount`/`MaxSpawnCount` 只控制管理器的自动生成；`CustomSpawnPoints` 为空时角色/波次仍会生成，但不会传送玩家，物品生成仍需要至少一个刷新点。物品实现接口时会在点位置创建原版 `BaseItem`，不会发放到玩家背包。
 
 自动生成提供者若还需要动态条件，可同时实现 `ISpawnCondition`，例如（需 `using LabApi.Features.Wrappers;`）：`public bool CanSpawnOnRoundStart() => Player.List.Count(player => player.IsAlive) >= 5;`。管理器会在生成前检查；波次中的角色也会逐个检查。
 
@@ -281,7 +281,7 @@ tools/                   vsbuild.py、ApiDoc.cs
 
 ## 版本
 
-当前版本：**7.0.0**
+当前版本：**8.0.0**
 
 采用 `MAJOR.MINOR.PATCH`：
 
