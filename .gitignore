@@ -26,3 +26,6 @@ __pycache__/
 
 # 工作区自带的外部记忆库（不提交）
 .dsh-meow/
+
+# VS Code工作区
+*.code-workspace
